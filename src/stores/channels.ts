@@ -34,31 +34,10 @@ export const useChannelsStore = create<ChannelsState>((set, get) => ({
   error: null,
   
   fetchChannels: async () => {
-    set({ loading: true, error: null });
-    
-    try {
-      // OpenClaw uses channels.status to get channel information
-      const result = await window.electron.ipcRenderer.invoke(
-        'gateway:rpc',
-        'channels.status',
-        {}
-      ) as { success: boolean; result?: { channels?: Channel[] } | Channel[]; error?: string };
-      
-      if (result.success && result.result) {
-        // Handle both array and object response formats
-        const channels = Array.isArray(result.result) 
-          ? result.result 
-          : (result.result.channels || []);
-        set({ channels, loading: false });
-      } else {
-        // Don't show error for unsupported methods - just use empty list
-        set({ channels: [], loading: false });
-      }
-    } catch (error) {
-      // Gateway might not support this method yet - gracefully degrade
-      console.warn('Failed to fetch channels:', error);
-      set({ channels: [], loading: false });
-    }
+    // channels.status returns a complex nested object, not a simple array.
+    // Channel management is deferred to Settings > Channels page.
+    // For now, just use empty list - channels will be added later.
+    set({ channels: [], loading: false });
   },
   
   addChannel: async (params) => {
