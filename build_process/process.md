@@ -14,6 +14,7 @@
 * [commit_6] Auto-update functionality - electron-updater integration with UI
 * [commit_7] Packaging and distribution - CI/CD, multi-platform builds, icon generation
 * [commit_8] Chat interface - Markdown support, typing indicator, welcome screen
+* [commit_9] Skills browser - Bundles, categories, detail dialog
 
 ### Plan:
 1. ~~Initialize project structure~~ ✅
@@ -24,7 +25,7 @@
 6. ~~Add auto-update functionality~~ ✅
 7. ~~Packaging and distribution setup~~ ✅
 8. ~~Chat interface~~ ✅
-9. Skills browser/enable page
+9. ~~Skills browser/enable page~~ ✅
 10. Cron tasks management
 
 ## Version Milestones
