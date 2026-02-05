@@ -167,10 +167,34 @@ export function buildProviderEnvVars(providers: Array<{ type: string; apiKey: st
  * Used to set the gateway's default model when the user selects a provider
  */
 const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
-  anthropic: 'anthropic/claude-opus-4-5',
-  openai: 'openai/gpt-5',
-  google: 'google/gemini-2.5-pro-preview',
-  openrouter: 'openrouter/auto',
+  anthropic: 'anthropic/claude-opus-4-6',
+  openai: 'openai/gpt-5.2',
+  google: 'google/gemini-3-pro-preview',
+  openrouter: 'openrouter/anthropic/claude-opus-4.6',
+};
+
+/**
+ * Provider configurations needed for model resolution.
+ * OpenClaw resolves models by checking cfg.models.providers[provider].
+ * Without this, any model for the provider returns "Unknown model".
+ */
+const PROVIDER_CONFIGS: Record<string, { baseUrl: string; api: string; apiKeyEnv: string }> = {
+  openrouter: {
+    baseUrl: 'https://openrouter.ai/api/v1',
+    api: 'openai-completions',
+    apiKeyEnv: 'OPENROUTER_API_KEY',
+  },
+  openai: {
+    baseUrl: 'https://api.openai.com/v1',
+    api: 'openai-responses',
+    apiKeyEnv: 'OPENAI_API_KEY',
+  },
+  google: {
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    api: 'google',
+    apiKeyEnv: 'GEMINI_API_KEY',
+  },
+  // anthropic is built-in to OpenClaw's model registry, no provider config needed
 };
 
 /**
@@ -203,6 +227,28 @@ export function setOpenClawDefaultModel(provider: string): void {
   defaults.model = { primary: model };
   agents.defaults = defaults;
   config.agents = agents;
+  
+  // Configure models.providers for providers that need explicit registration
+  // Without this, OpenClaw returns "Unknown model" because it can't resolve
+  // the provider's baseUrl and API type
+  const providerCfg = PROVIDER_CONFIGS[provider];
+  if (providerCfg) {
+    const models = (config.models || {}) as Record<string, unknown>;
+    const providers = (models.providers || {}) as Record<string, unknown>;
+    
+    // Only set if not already configured
+    if (!providers[provider]) {
+      providers[provider] = {
+        baseUrl: providerCfg.baseUrl,
+        api: providerCfg.api,
+        apiKey: providerCfg.apiKeyEnv,
+      };
+      console.log(`Configured models.providers.${provider} with baseUrl=${providerCfg.baseUrl}`);
+    }
+    
+    models.providers = providers;
+    config.models = models;
+  }
   
   // Ensure gateway mode is set
   const gateway = (config.gateway || {}) as Record<string, unknown>;
