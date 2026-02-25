@@ -1,7 +1,7 @@
 /**
  * TitleBar Component
  * macOS: empty drag region (native traffic lights handled by hiddenInset).
- * Windows/Linux: icon + "OClaw" on left, minimize/maximize/close on right.
+ * Windows/Linux: icon + "Oclaw" on left, minimize/maximize/close on right.
  */
 import { useState, useEffect } from 'react';
 import { Minus, Square, X, Copy } from 'lucide-react';
@@ -48,9 +48,9 @@ function WindowsTitleBar() {
     <div className="drag-region flex h-10 shrink-0 items-center justify-between border-b bg-background">
       {/* Left: Icon + App Name */}
       <div className="no-drag flex items-center gap-2 pl-3">
-        <img src={logoSvg} alt="OClaw" className="h-5 w-auto" />
+        <img src={logoSvg} alt="Oclaw" className="h-5 w-auto" />
         <span className="text-xs font-medium text-muted-foreground select-none">
-          OClaw
+          Oclaw
         </span>
       </div>
 

@@ -8,11 +8,11 @@ const OCLAW_BEGIN = '<!-- oclaw:begin -->';
 const OCLAW_END = '<!-- oclaw:end -->';
 
 /**
- * Merge a OClaw context section into an existing file's content.
+ * Merge a Oclaw context section into an existing file's content.
  * If markers already exist, replaces the section in-place.
  * Otherwise appends it at the end.
  */
-export function mergeOClawSection(existing: string, section: string): string {
+export function mergeOclawSection(existing: string, section: string): string {
   const wrapped = `${OCLAW_BEGIN}\n${section.trim()}\n${OCLAW_END}`;
   const beginIdx = existing.indexOf(OCLAW_BEGIN);
   const endIdx = existing.indexOf(OCLAW_END);
@@ -73,18 +73,18 @@ function resolveAllWorkspaceDirs(): string[] {
 }
 
 /**
- * Ensure OClaw context snippets are merged into the openclaw workspace
+ * Ensure Oclaw context snippets are merged into the openclaw workspace
  * bootstrap files. Reads `*.oclaw.md` templates from resources/context/
  * and injects them as marker-delimited sections into the corresponding
  * workspace `.md` files (e.g. AGENTS.oclaw.md -> AGENTS.md).
  *
  * Iterates over every discovered agent workspace so all agents receive
- * the OClaw context regardless of which one is active.
+ * the Oclaw context regardless of which one is active.
  */
-export function ensureOClawContext(): void {
+export function ensureOclawContext(): void {
   const contextDir = join(getResourcesDir(), 'context');
   if (!existsSync(contextDir)) {
-    logger.debug('OClaw context directory not found, skipping context merge');
+    logger.debug('Oclaw context directory not found, skipping context merge');
     return;
   }
 
@@ -112,10 +112,10 @@ export function ensureOClawContext(): void {
         existing = readFileSync(targetPath, 'utf-8');
       }
 
-      const merged = mergeOClawSection(existing, section);
+      const merged = mergeOclawSection(existing, section);
       if (merged !== existing) {
         writeFileSync(targetPath, merged, 'utf-8');
-        logger.info(`Merged OClaw context into ${targetName} (${workspaceDir})`);
+        logger.info(`Merged Oclaw context into ${targetName} (${workspaceDir})`);
       }
     }
   }

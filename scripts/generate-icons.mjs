@@ -14,7 +14,7 @@ const JPG_SOURCE = path.join(ICONS_DIR, 'oclaw-no-text.jpg');
 const SVG_SOURCE = path.join(ICONS_DIR, 'icon.svg');
 const SOURCE_IMAGE = fs.existsSync(JPG_SOURCE) ? JPG_SOURCE : SVG_SOURCE;
 
-echo`🎨 Generating OClaw icons using Node.js...`;
+echo`🎨 Generating Oclaw icons using Node.js...`;
 
 // Check if icon source exists
 if (!fs.existsSync(SOURCE_IMAGE)) {

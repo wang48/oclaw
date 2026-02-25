@@ -399,12 +399,12 @@ export function setOpenClawDefaultModelWithOverride(
 
 // Re-export for backwards compatibility
 /**
- * Write the OClaw gateway token into ~/.openclaw/openclaw.json so the
+ * Write the Oclaw gateway token into ~/.openclaw/openclaw.json so the
  * gateway process reads the same token we use for the WebSocket handshake.
  *
  * Without this, openclaw.json may contain a stale token written by the
  * system-managed gateway service (launchctl), causing a "token mismatch"
- * auth failure when OClaw connects to the process it just spawned.
+ * auth failure when Oclaw connects to the process it just spawned.
  */
 export function syncGatewayTokenToConfig(token: string): void {
   const configPath = join(homedir(), '.openclaw', 'openclaw.json');

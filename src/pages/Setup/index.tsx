@@ -57,7 +57,7 @@ const STEP = {
 const steps: SetupStep[] = [
   {
     id: 'welcome',
-    title: 'Welcome to OClaw',
+    title: 'Welcome to Oclaw',
     description: 'Your AI assistant is ready to be configured',
   },
   {
@@ -83,7 +83,7 @@ const steps: SetupStep[] = [
   {
     id: 'complete',
     title: 'All Set!',
-    description: 'OClaw is ready to use',
+    description: 'Oclaw is ready to use',
   },
 ];
 
@@ -317,7 +317,7 @@ function WelcomeContent() {
   return (
     <div className="text-center space-y-4">
       <div className="mb-4 flex justify-center">
-        <img src={oclawIcon} alt="OClaw" className="h-16 w-16" />
+        <img src={oclawIcon} alt="Oclaw" className="h-16 w-16" />
       </div>
       <h2 className="text-xl font-semibold">{t('welcome.title')}</h2>
       <p className="text-muted-foreground">

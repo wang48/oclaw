@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Post-installation script for OClaw on Linux
+# Post-installation script for Oclaw on Linux
 
 set -e
 
@@ -15,8 +15,8 @@ if command -v gtk-update-icon-cache &> /dev/null; then
 fi
 
 # Create symbolic link for CLI access (optional)
-if [ -x /opt/OClaw/oclaw ]; then
-    ln -sf /opt/OClaw/oclaw /usr/local/bin/oclaw 2>/dev/null || true
+if [ -x /opt/Oclaw/oclaw ]; then
+    ln -sf /opt/Oclaw/oclaw /usr/local/bin/oclaw 2>/dev/null || true
 fi
 
-echo "OClaw has been installed successfully."
+echo "Oclaw has been installed successfully."

@@ -7,10 +7,10 @@
  * Port configuration
  */
 export const PORTS = {
-  /** OClaw GUI development server port */
+  /** Oclaw GUI development server port */
   OCLAW_DEV: 5173,
   
-  /** OClaw GUI production port (for reference) */
+  /** Oclaw GUI production port (for reference) */
   OCLAW_GUI: 23333,
   
   /** OpenClaw Gateway port */
@@ -33,7 +33,7 @@ export const APP_PATHS = {
   /** OpenClaw configuration directory */
   OPENCLAW_CONFIG: '~/.openclaw',
   
-  /** OClaw configuration directory */
+  /** Oclaw configuration directory */
   OCLAW_CONFIG: '~/.oclaw',
   
   /** Log files directory */

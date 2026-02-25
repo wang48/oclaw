@@ -1,6 +1,6 @@
 appId: app.oclaw.desktop
-productName: OClaw
-copyright: Copyright © 2026 OClaw
+productName: Oclaw
+copyright: Copyright © 2026 Oclaw
 compression: maximum
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
@@ -49,7 +49,7 @@ publish:
     useMultipleRangeRequest: false
   - provider: github
     owner: ValueCell-ai
-    repo: OClaw
+    repo: Oclaw
     releaseType: release
 
 # macOS Configuration
@@ -75,8 +75,8 @@ mac:
   entitlementsInherit: entitlements.mac.plist
   notarize: true
   extendInfo:
-    NSMicrophoneUsageDescription: OClaw requires microphone access for voice features
-    NSCameraUsageDescription: OClaw requires camera access for video features
+    NSMicrophoneUsageDescription: Oclaw requires microphone access for voice features
+    NSCameraUsageDescription: Oclaw requires camera access for video features
 
 dmg:
   background: resources/dmg-background.png
@@ -117,8 +117,8 @@ nsis:
   differentialPackage: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: OClaw
-  uninstallDisplayName: OClaw
+  shortcutName: Oclaw
+  uninstallDisplayName: Oclaw
   license: LICENSE
   include: scripts/installer.nsh
   installerIcon: resources/icons/icon.ico
@@ -143,16 +143,16 @@ linux:
       arch:
         - x64
   category: Utility
-  maintainer: OClaw Team <team@oclaw.app>
-  vendor: OClaw
+  maintainer: Oclaw Team <team@oclaw.app>
+  vendor: Oclaw
   synopsis: AI Assistant powered by OpenClaw
   description: |
-    OClaw is a graphical AI assistant application that integrates with
+    Oclaw is a graphical AI assistant application that integrates with
     OpenClaw Gateway to provide intelligent automation and assistance
     across multiple messaging platforms.
   desktop:
     entry:
-      Name: OClaw
+      Name: Oclaw
       Comment: AI Assistant powered by OpenClaw
       Categories: Utility;Network;
       Keywords: ai;assistant;automation;chat;

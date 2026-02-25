@@ -1,9 +1,9 @@
 
 <p align="center">
-  <img src="src/assets/logo.svg" width="128" height="128" alt="OClaw Logo" />
+  <img src="src/assets/logo.svg" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
-<h1 align="center">OClaw</h1>
+<h1 align="center">Oclaw</h1>
 
 <p align="center">
   <strong>The Desktop Interface for OpenClaw AI Agents</strong>
@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="#features">Features</a> •
-  <a href="#why-oclaw">Why OClaw</a> •
+  <a href="#why-oclaw">Why Oclaw</a> •
   <a href="#getting-started">Getting Started</a> •
   <a href="#architecture">Architecture</a> •
   <a href="#development">Development</a> •
@@ -37,11 +37,11 @@
 
 ## Overview
 
-**OClaw** bridges the gap between powerful AI agents and everyday users. Built on top of [OpenClaw](https://github.com/OpenClaw), it transforms command-line AI orchestration into an accessible, beautiful desktop experience—no terminal required.
+**Oclaw** bridges the gap between powerful AI agents and everyday users. Built on top of [OpenClaw](https://github.com/OpenClaw), it transforms command-line AI orchestration into an accessible, beautiful desktop experience—no terminal required.
 
-Whether you're automating workflows, managing AI-powered channels, or scheduling intelligent tasks, OClaw provides the interface you need to harness AI agents effectively.
+Whether you're automating workflows, managing AI-powered channels, or scheduling intelligent tasks, Oclaw provides the interface you need to harness AI agents effectively.
 
-OClaw comes pre-configured with best-practice model providers and natively supports Windows as well as multi-language settings. Of course, you can also fine-tune advanced configurations via **Settings → Advanced → Developer Mode**.
+Oclaw comes pre-configured with best-practice model providers and natively supports Windows as well as multi-language settings. Of course, you can also fine-tune advanced configurations via **Settings → Advanced → Developer Mode**.
 
 ---
 ## Screenshot
@@ -72,11 +72,11 @@ OClaw comes pre-configured with best-practice model providers and natively suppo
 
 ---
 
-## Why OClaw
+## Why Oclaw
 
-Building AI agents shouldn't require mastering the command line. OClaw was designed with a simple philosophy: **powerful technology deserves an interface that respects your time.**
+Building AI agents shouldn't require mastering the command line. Oclaw was designed with a simple philosophy: **powerful technology deserves an interface that respects your time.**
 
-| Challenge | OClaw Solution |
+| Challenge | Oclaw Solution |
 |-----------|----------------|
 | Complex CLI setup | One-click installation with guided setup wizard |
 | Configuration files | Visual settings with real-time validation |
@@ -86,7 +86,7 @@ Building AI agents shouldn't require mastering the command line. OClaw was desig
 
 ### OpenClaw Inside
 
-OClaw is built directly upon the official **OpenClaw** core. Instead of requiring a separate installation, we embed the runtime within the application to provide a seamless "battery-included" experience.
+Oclaw is built directly upon the official **OpenClaw** core. Instead of requiring a separate installation, we embed the runtime within the application to provide a seamless "battery-included" experience.
 
 We are committed to maintaining strict alignment with the upstream OpenClaw project, ensuring that you always have access to the latest capabilities, stability improvements, and ecosystem compatibility provided by the official releases.
 
@@ -113,7 +113,7 @@ Extend your AI agents with pre-built skills. Browse, install, and manage skills 
 Connect to multiple AI providers (OpenAI, Anthropic, and more) with credentials stored securely in your system's native keychain.
 
 ### 🌙 Adaptive Theming
-Light mode, dark mode, or system-synchronized themes. OClaw adapts to your preferences automatically.
+Light mode, dark mode, or system-synchronized themes. Oclaw adapts to your preferences automatically.
 
 ---
 
@@ -136,7 +136,7 @@ Download the latest release for your platform from the [Releases](https://github
 ```bash
 # Clone the repository
 git clone https://github.com/wang48/oclaw.git
-cd OClaw
+cd Oclaw
 
 # Initialize the project
 pnpm run init
@@ -147,7 +147,7 @@ pnpm dev
 
 ### First Launch
 
-When you launch OClaw for the first time, the **Setup Wizard** will guide you through:
+When you launch Oclaw for the first time, the **Setup Wizard** will guide you through:
 
 1. **Language & Region** – Configure your preferred locale
 2. **AI Provider** – Enter your API keys for supported providers
@@ -158,11 +158,11 @@ When you launch OClaw for the first time, the **Setup Wizard** will guide you th
 
 ## Architecture
 
-OClaw employs a **dual-process architecture** that separates UI concerns from AI runtime operations:
+Oclaw employs a **dual-process architecture** that separates UI concerns from AI runtime operations:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        OClaw Desktop App                         │
+│                        Oclaw Desktop App                         │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │              Electron Main Process                          │  │
@@ -230,7 +230,7 @@ Chain multiple skills together to create sophisticated automation pipelines. Pro
 ### Project Structure
 
 ```
-OClaw/
+Oclaw/
 ├── electron/              # Electron Main Process
 │   ├── main/             # Application entry, window management
 │   ├── gateway/          # OpenClaw Gateway process manager
@@ -285,21 +285,21 @@ pnpm package:linux        # Package for Linux
 
 ### CLI Mode
 
-OClaw now supports a command-line mode from the same executable:
+Oclaw now supports a command-line mode from the same executable:
 
 ```bash
 # General
-OClaw --cli help
-OClaw --cli status
+Oclaw --cli help
+Oclaw --cli status
 
 # Gateway / RPC
-OClaw --cli gateway start
-OClaw --cli gateway rpc sessions.list '{"limit":50}'
+Oclaw --cli gateway start
+Oclaw --cli gateway rpc sessions.list '{"limit":50}'
 
 # Provider / Channel / Cron
-OClaw --cli provider list
-OClaw --cli channel list
-OClaw --cli cron list
+Oclaw --cli provider list
+Oclaw --cli channel list
+Oclaw --cli cron list
 ```
 
 Available command groups:
@@ -330,7 +330,7 @@ Available command groups:
 
 ## Contributing
 
-We welcome contributions from the community! Whether it's bug fixes, new features, documentation improvements, or translations—every contribution helps make OClaw better.
+We welcome contributions from the community! Whether it's bug fixes, new features, documentation improvements, or translations—every contribution helps make Oclaw better.
 
 ### How to Contribute
 
@@ -351,7 +351,7 @@ We welcome contributions from the community! Whether it's bug fixes, new feature
 
 ## Acknowledgments
 
-OClaw is built on the shoulders of excellent open-source projects:
+Oclaw is built on the shoulders of excellent open-source projects:
 
 - [OpenClaw](https://github.com/OpenClaw) – The AI agent runtime
 - [Electron](https://www.electronjs.org/) – Cross-platform desktop framework
@@ -373,7 +373,7 @@ Join our community to connect with other users, get support, and share your expe
 
 ## License
 
-OClaw is released under the [MIT License](LICENSE). You're free to use, modify, and distribute this software.
+Oclaw is released under the [MIT License](LICENSE). You're free to use, modify, and distribute this software.
 
 ---
 

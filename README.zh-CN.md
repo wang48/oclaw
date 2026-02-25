@@ -1,9 +1,9 @@
 
 <p align="center">
-  <img src="src/assets/logo.svg" width="128" height="128" alt="OClaw Logo" />
+  <img src="src/assets/logo.svg" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
-<h1 align="center">OClaw</h1>
+<h1 align="center">Oclaw</h1>
 
 <p align="center">
   <strong>OpenClaw AI 智能体的桌面客户端</strong>
@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="#功能特性">功能特性</a> •
-  <a href="#为什么选择-oclaw">为什么选择 OClaw</a> •
+  <a href="#为什么选择-oclaw">为什么选择 Oclaw</a> •
   <a href="#快速上手">快速上手</a> •
   <a href="#系统架构">系统架构</a> •
   <a href="#开发指南">开发指南</a> •
@@ -37,11 +37,11 @@
 
 ## 概述
 
-**OClaw** 是连接强大 AI 智能体与普通用户之间的桥梁。基于 [OpenClaw](https://github.com/OpenClaw) 构建，它将命令行式的 AI 编排转变为易用、美观的桌面体验——无需使用终端。
+**Oclaw** 是连接强大 AI 智能体与普通用户之间的桥梁。基于 [OpenClaw](https://github.com/OpenClaw) 构建，它将命令行式的 AI 编排转变为易用、美观的桌面体验——无需使用终端。
 
-无论是自动化工作流、连接通讯软件，还是调度智能定时任务，OClaw 都能提供高效易用的图形界面，帮助你充分发挥 AI 智能体的能力。
+无论是自动化工作流、连接通讯软件，还是调度智能定时任务，Oclaw 都能提供高效易用的图形界面，帮助你充分发挥 AI 智能体的能力。
 
-OClaw 预置了最佳实践的模型供应商配置，原生支持 Windows 平台以及多语言设置。当然，你也可以通过 **设置 → 高级 → 开发者模式** 来进行精细的高级配置。
+Oclaw 预置了最佳实践的模型供应商配置，原生支持 Windows 平台以及多语言设置。当然，你也可以通过 **设置 → 高级 → 开发者模式** 来进行精细的高级配置。
 
 ---
 
@@ -73,11 +73,11 @@ OClaw 预置了最佳实践的模型供应商配置，原生支持 Windows 平�
 
 ---
 
-## 为什么选择 OClaw
+## 为什么选择 Oclaw
 
-构建 AI 智能体不应该需要精通命令行。OClaw 的设计理念很简单：**强大的技术值得拥有一个尊重用户时间的界面。**
+构建 AI 智能体不应该需要精通命令行。Oclaw 的设计理念很简单：**强大的技术值得拥有一个尊重用户时间的界面。**
 
-| 痛点 | OClaw 解决方案 |
+| 痛点 | Oclaw 解决方案 |
 |------|----------------|
 | 复杂的命令行配置 | 一键安装，配合引导式设置向导 |
 | 手动编辑配置文件 | 可视化设置界面，实时校验 |
@@ -87,7 +87,7 @@ OClaw 预置了最佳实践的模型供应商配置，原生支持 Windows 平�
 
 ### 内置 OpenClaw 核心
 
-OClaw 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们将运行时嵌入应用内部，提供开箱即用的无缝体验。
+Oclaw 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们将运行时嵌入应用内部，提供开箱即用的无缝体验。
 
 我们致力于与上游 OpenClaw 项目保持严格同步，确保你始终可以使用官方发布的最新功能、稳定性改进和生态兼容性。
 
@@ -114,7 +114,7 @@ OClaw 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们
 连接多个 AI 供应商（OpenAI、Anthropic 等），凭证安全存储在系统原生密钥链中。
 
 ### 🌙 自适应主题
-支持浅色模式、深色模式或跟随系统主题。OClaw 自动适应你的偏好设置。
+支持浅色模式、深色模式或跟随系统主题。Oclaw 自动适应你的偏好设置。
 
 ---
 
@@ -137,7 +137,7 @@ OClaw 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们
 ```bash
 # 克隆仓库
 git clone https://github.com/wang48/oclaw.git
-cd OClaw
+cd Oclaw
 
 # 初始化项目
 pnpm run init
@@ -148,7 +148,7 @@ pnpm dev
 
 ### 首次启动
 
-首次启动 OClaw 时，**设置向导** 将引导你完成以下步骤：
+首次启动 Oclaw 时，**设置向导** 将引导你完成以下步骤：
 
 1. **语言与区域** – 配置你的首选语言和地区
 2. **AI 供应商** – 输入所支持供应商的 API 密钥
@@ -159,11 +159,11 @@ pnpm dev
 
 ## 系统架构
 
-OClaw 采用 **双进程架构**，将 UI 层与 AI 运行时操作分离：
+Oclaw 采用 **双进程架构**，将 UI 层与 AI 运行时操作分离：
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        OClaw 桌面应用                             │
+│                        Oclaw 桌面应用                             │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │              Electron 主进程                                 │  │
@@ -231,7 +231,7 @@ OClaw 采用 **双进程架构**，将 UI 层与 AI 运行时操作分离：
 ### 项目结构
 
 ```
-OClaw/
+Oclaw/
 ├── electron/              # Electron 主进程
 │   ├── main/             # 应用入口、窗口管理
 │   ├── gateway/          # OpenClaw 网关进程管理
@@ -286,21 +286,21 @@ pnpm package:linux        # 为 Linux 打包
 
 ### CLI 模式
 
-OClaw 现在支持通过同一个可执行文件进入命令行模式：
+Oclaw 现在支持通过同一个可执行文件进入命令行模式：
 
 ```bash
 # 通用
-OClaw --cli help
-OClaw --cli status
+Oclaw --cli help
+Oclaw --cli status
 
 # 网关 / RPC
-OClaw --cli gateway start
-OClaw --cli gateway rpc sessions.list '{"limit":50}'
+Oclaw --cli gateway start
+Oclaw --cli gateway rpc sessions.list '{"limit":50}'
 
 # Provider / Channel / Cron
-OClaw --cli provider list
-OClaw --cli channel list
-OClaw --cli cron list
+Oclaw --cli provider list
+Oclaw --cli channel list
+Oclaw --cli cron list
 ```
 
 目前支持的命令组：
@@ -331,7 +331,7 @@ OClaw --cli cron list
 
 ## 参与贡献
 
-我们欢迎社区的各种贡献！无论是修复 Bug、开发新功能、改进文档还是翻译——每一份贡献都让 OClaw 变得更好。
+我们欢迎社区的各种贡献！无论是修复 Bug、开发新功能、改进文档还是翻译——每一份贡献都让 Oclaw 变得更好。
 
 ### 如何贡献
 
@@ -352,7 +352,7 @@ OClaw --cli cron list
 
 ## 致谢
 
-OClaw 构建于以下优秀的开源项目之上：
+Oclaw 构建于以下优秀的开源项目之上：
 
 - [OpenClaw](https://github.com/OpenClaw) – AI 智能体运行时
 - [Electron](https://www.electronjs.org/) – 跨平台桌面框架
@@ -374,7 +374,7 @@ OClaw 构建于以下优秀的开源项目之上：
 
 ## 许可证
 
-OClaw 基于 [MIT 许可证](LICENSE) 发布。你可以自由地使用、修改和分发本软件。
+Oclaw 基于 [MIT 许可证](LICENSE) 发布。你可以自由地使用、修改和分发本软件。
 
 ---
 

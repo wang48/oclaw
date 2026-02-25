@@ -971,7 +971,7 @@ export class GatewayManager extends EventEmitter {
             maxProtocol: 3,
             client: {
               id: clientId,
-              displayName: 'OClaw',
+              displayName: 'Oclaw',
               version: '0.1.0',
               platform: process.platform,
               mode: clientMode,

@@ -57,7 +57,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
   tray = new Tray(icon);
   
   // Set tooltip
-  tray.setToolTip('OClaw - AI Assistant');
+  tray.setToolTip('Oclaw - AI Assistant');
   
   const showWindow = () => {
     if (mainWindow.isDestroyed()) return;
@@ -68,7 +68,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
   // Create context menu
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show OClaw',
+      label: 'Show Oclaw',
       click: showWindow,
     },
     {
@@ -130,7 +130,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
       type: 'separator',
     },
     {
-      label: 'Quit OClaw',
+      label: 'Quit Oclaw',
       click: () => {
         app.quit();
       },
@@ -165,7 +165,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
  */
 export function updateTrayStatus(status: string): void {
   if (tray) {
-    tray.setToolTip(`OClaw - ${status}`);
+    tray.setToolTip(`Oclaw - ${status}`);
   }
 }
 
