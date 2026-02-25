@@ -4,20 +4,20 @@ import { homedir } from 'os';
 import { logger } from './logger';
 import { getResourcesDir } from './paths';
 
-const CLAWX_BEGIN = '<!-- clawx:begin -->';
-const CLAWX_END = '<!-- clawx:end -->';
+const OCLAW_BEGIN = '<!-- oclaw:begin -->';
+const OCLAW_END = '<!-- oclaw:end -->';
 
 /**
- * Merge a ClawX context section into an existing file's content.
+ * Merge a OClaw context section into an existing file's content.
  * If markers already exist, replaces the section in-place.
  * Otherwise appends it at the end.
  */
-export function mergeClawXSection(existing: string, section: string): string {
-  const wrapped = `${CLAWX_BEGIN}\n${section.trim()}\n${CLAWX_END}`;
-  const beginIdx = existing.indexOf(CLAWX_BEGIN);
-  const endIdx = existing.indexOf(CLAWX_END);
+export function mergeOClawSection(existing: string, section: string): string {
+  const wrapped = `${OCLAW_BEGIN}\n${section.trim()}\n${OCLAW_END}`;
+  const beginIdx = existing.indexOf(OCLAW_BEGIN);
+  const endIdx = existing.indexOf(OCLAW_END);
   if (beginIdx !== -1 && endIdx !== -1) {
-    return existing.slice(0, beginIdx) + wrapped + existing.slice(endIdx + CLAWX_END.length);
+    return existing.slice(0, beginIdx) + wrapped + existing.slice(endIdx + OCLAW_END.length);
   }
   return existing.trimEnd() + '\n\n' + wrapped + '\n';
 }
@@ -73,24 +73,24 @@ function resolveAllWorkspaceDirs(): string[] {
 }
 
 /**
- * Ensure ClawX context snippets are merged into the openclaw workspace
- * bootstrap files. Reads `*.clawx.md` templates from resources/context/
+ * Ensure OClaw context snippets are merged into the openclaw workspace
+ * bootstrap files. Reads `*.oclaw.md` templates from resources/context/
  * and injects them as marker-delimited sections into the corresponding
- * workspace `.md` files (e.g. AGENTS.clawx.md -> AGENTS.md).
+ * workspace `.md` files (e.g. AGENTS.oclaw.md -> AGENTS.md).
  *
  * Iterates over every discovered agent workspace so all agents receive
- * the ClawX context regardless of which one is active.
+ * the OClaw context regardless of which one is active.
  */
-export function ensureClawXContext(): void {
+export function ensureOClawContext(): void {
   const contextDir = join(getResourcesDir(), 'context');
   if (!existsSync(contextDir)) {
-    logger.debug('ClawX context directory not found, skipping context merge');
+    logger.debug('OClaw context directory not found, skipping context merge');
     return;
   }
 
   let files: string[];
   try {
-    files = readdirSync(contextDir).filter((f) => f.endsWith('.clawx.md'));
+    files = readdirSync(contextDir).filter((f) => f.endsWith('.oclaw.md'));
   } catch {
     return;
   }
@@ -103,7 +103,7 @@ export function ensureClawXContext(): void {
     }
 
     for (const file of files) {
-      const targetName = file.replace('.clawx.md', '.md');
+      const targetName = file.replace('.oclaw.md', '.md');
       const targetPath = join(workspaceDir, targetName);
       const section = readFileSync(join(contextDir, file), 'utf-8');
 
@@ -112,10 +112,10 @@ export function ensureClawXContext(): void {
         existing = readFileSync(targetPath, 'utf-8');
       }
 
-      const merged = mergeClawXSection(existing, section);
+      const merged = mergeOClawSection(existing, section);
       if (merged !== existing) {
         writeFileSync(targetPath, merged, 'utf-8');
-        logger.info(`Merged ClawX context into ${targetName} (${workspaceDir})`);
+        logger.info(`Merged OClaw context into ${targetName} (${workspaceDir})`);
       }
     }
   }

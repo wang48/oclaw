@@ -554,14 +554,14 @@ export function Settings() {
             <Button
               variant="link"
               className="h-auto p-0"
-              onClick={() => window.electron.openExternal('https://claw-x.com')}
+              onClick={() => window.electron.openExternal('https://github.com/wang48/oclaw')}
             >
               {t('about.docs')}
             </Button>
             <Button
               variant="link"
               className="h-auto p-0"
-              onClick={() => window.electron.openExternal('https://github.com/ValueCell-ai/ClawX')}
+              onClick={() => window.electron.openExternal('https://github.com/wang48/oclaw')}
             >
               {t('about.github')}
             </Button>

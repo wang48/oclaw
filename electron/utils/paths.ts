@@ -35,21 +35,21 @@ export function getOpenClawSkillsDir(): string {
 }
 
 /**
- * Get ClawX config directory
+ * Get OClaw config directory
  */
-export function getClawXConfigDir(): string {
-  return join(homedir(), '.clawx');
+export function getOClawConfigDir(): string {
+  return join(homedir(), '.oclaw');
 }
 
 /**
- * Get ClawX logs directory
+ * Get OClaw logs directory
  */
 export function getLogsDir(): string {
   return join(app.getPath('userData'), 'logs');
 }
 
 /**
- * Get ClawX data directory
+ * Get OClaw data directory
  */
 export function getDataDir(): string {
   return app.getPath('userData');

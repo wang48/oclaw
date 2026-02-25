@@ -1,8 +1,8 @@
-## ClawX Tool Notes
+## OClaw Tool Notes
 
 ### uv (Python)
 
-- `uv` is the default Python environment manager. It is bundled with ClawX and on PATH.
+- `uv` is the default Python environment manager. It is bundled with OClaw and on PATH.
 - Use `uv run python <script>` to execute Python scripts.
 - Use `uv pip install <package>` to install packages.
 - Do NOT use bare `python` or `pip` -- always go through `uv`.

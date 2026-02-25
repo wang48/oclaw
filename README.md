@@ -1,9 +1,9 @@
 
 <p align="center">
-  <img src="src/assets/logo.svg" width="128" height="128" alt="ClawX Logo" />
+  <img src="src/assets/logo.svg" width="128" height="128" alt="OClaw Logo" />
 </p>
 
-<h1 align="center">ClawX</h1>
+<h1 align="center">OClaw</h1>
 
 <p align="center">
   <strong>The Desktop Interface for OpenClaw AI Agents</strong>
@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="#features">Features</a> •
-  <a href="#why-clawx">Why ClawX</a> •
+  <a href="#why-oclaw">Why OClaw</a> •
   <a href="#getting-started">Getting Started</a> •
   <a href="#architecture">Architecture</a> •
   <a href="#development">Development</a> •
@@ -25,7 +25,7 @@
   <a href="https://discord.com/invite/84Kex3GGAh" target="_blank">
   <img src="https://img.shields.io/discord/1399603591471435907?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord" />
   </a>
-  <img src="https://img.shields.io/github/downloads/ValueCell-ai/ClawX/total?color=%23027DEB" alt="Downloads" />
+  <img src="https://img.shields.io/github/downloads/wang48/oclaw/total?color=%23027DEB" alt="Downloads" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
@@ -37,11 +37,11 @@
 
 ## Overview
 
-**ClawX** bridges the gap between powerful AI agents and everyday users. Built on top of [OpenClaw](https://github.com/OpenClaw), it transforms command-line AI orchestration into an accessible, beautiful desktop experience—no terminal required.
+**OClaw** bridges the gap between powerful AI agents and everyday users. Built on top of [OpenClaw](https://github.com/OpenClaw), it transforms command-line AI orchestration into an accessible, beautiful desktop experience—no terminal required.
 
-Whether you're automating workflows, managing AI-powered channels, or scheduling intelligent tasks, ClawX provides the interface you need to harness AI agents effectively.
+Whether you're automating workflows, managing AI-powered channels, or scheduling intelligent tasks, OClaw provides the interface you need to harness AI agents effectively.
 
-ClawX comes pre-configured with best-practice model providers and natively supports Windows as well as multi-language settings. Of course, you can also fine-tune advanced configurations via **Settings → Advanced → Developer Mode**.
+OClaw comes pre-configured with best-practice model providers and natively supports Windows as well as multi-language settings. Of course, you can also fine-tune advanced configurations via **Settings → Advanced → Developer Mode**.
 
 ---
 ## Screenshot
@@ -72,11 +72,11 @@ ClawX comes pre-configured with best-practice model providers and natively suppo
 
 ---
 
-## Why ClawX
+## Why OClaw
 
-Building AI agents shouldn't require mastering the command line. ClawX was designed with a simple philosophy: **powerful technology deserves an interface that respects your time.**
+Building AI agents shouldn't require mastering the command line. OClaw was designed with a simple philosophy: **powerful technology deserves an interface that respects your time.**
 
-| Challenge | ClawX Solution |
+| Challenge | OClaw Solution |
 |-----------|----------------|
 | Complex CLI setup | One-click installation with guided setup wizard |
 | Configuration files | Visual settings with real-time validation |
@@ -86,7 +86,7 @@ Building AI agents shouldn't require mastering the command line. ClawX was desig
 
 ### OpenClaw Inside
 
-ClawX is built directly upon the official **OpenClaw** core. Instead of requiring a separate installation, we embed the runtime within the application to provide a seamless "battery-included" experience.
+OClaw is built directly upon the official **OpenClaw** core. Instead of requiring a separate installation, we embed the runtime within the application to provide a seamless "battery-included" experience.
 
 We are committed to maintaining strict alignment with the upstream OpenClaw project, ensuring that you always have access to the latest capabilities, stability improvements, and ecosystem compatibility provided by the official releases.
 
@@ -113,7 +113,7 @@ Extend your AI agents with pre-built skills. Browse, install, and manage skills 
 Connect to multiple AI providers (OpenAI, Anthropic, and more) with credentials stored securely in your system's native keychain.
 
 ### 🌙 Adaptive Theming
-Light mode, dark mode, or system-synchronized themes. ClawX adapts to your preferences automatically.
+Light mode, dark mode, or system-synchronized themes. OClaw adapts to your preferences automatically.
 
 ---
 
@@ -129,14 +129,14 @@ Light mode, dark mode, or system-synchronized themes. ClawX adapts to your prefe
 
 #### Pre-built Releases (Recommended)
 
-Download the latest release for your platform from the [Releases](https://github.com/ValueCell-ai/ClawX/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/wang48/oclaw/releases) page.
 
 #### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/ValueCell-ai/ClawX.git
-cd ClawX
+git clone https://github.com/wang48/oclaw.git
+cd OClaw
 
 # Initialize the project
 pnpm run init
@@ -147,7 +147,7 @@ pnpm dev
 
 ### First Launch
 
-When you launch ClawX for the first time, the **Setup Wizard** will guide you through:
+When you launch OClaw for the first time, the **Setup Wizard** will guide you through:
 
 1. **Language & Region** – Configure your preferred locale
 2. **AI Provider** – Enter your API keys for supported providers
@@ -158,11 +158,11 @@ When you launch ClawX for the first time, the **Setup Wizard** will guide you th
 
 ## Architecture
 
-ClawX employs a **dual-process architecture** that separates UI concerns from AI runtime operations:
+OClaw employs a **dual-process architecture** that separates UI concerns from AI runtime operations:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        ClawX Desktop App                         │
+│                        OClaw Desktop App                         │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │              Electron Main Process                          │  │
@@ -230,7 +230,7 @@ Chain multiple skills together to create sophisticated automation pipelines. Pro
 ### Project Structure
 
 ```
-ClawX/
+OClaw/
 ├── electron/              # Electron Main Process
 │   ├── main/             # Application entry, window management
 │   ├── gateway/          # OpenClaw Gateway process manager
@@ -285,21 +285,21 @@ pnpm package:linux        # Package for Linux
 
 ### CLI Mode
 
-ClawX now supports a command-line mode from the same executable:
+OClaw now supports a command-line mode from the same executable:
 
 ```bash
 # General
-ClawX --cli help
-ClawX --cli status
+OClaw --cli help
+OClaw --cli status
 
 # Gateway / RPC
-ClawX --cli gateway start
-ClawX --cli gateway rpc sessions.list '{"limit":50}'
+OClaw --cli gateway start
+OClaw --cli gateway rpc sessions.list '{"limit":50}'
 
 # Provider / Channel / Cron
-ClawX --cli provider list
-ClawX --cli channel list
-ClawX --cli cron list
+OClaw --cli provider list
+OClaw --cli channel list
+OClaw --cli cron list
 ```
 
 Available command groups:
@@ -330,7 +330,7 @@ Available command groups:
 
 ## Contributing
 
-We welcome contributions from the community! Whether it's bug fixes, new features, documentation improvements, or translations—every contribution helps make ClawX better.
+We welcome contributions from the community! Whether it's bug fixes, new features, documentation improvements, or translations—every contribution helps make OClaw better.
 
 ### How to Contribute
 
@@ -351,7 +351,7 @@ We welcome contributions from the community! Whether it's bug fixes, new feature
 
 ## Acknowledgments
 
-ClawX is built on the shoulders of excellent open-source projects:
+OClaw is built on the shoulders of excellent open-source projects:
 
 - [OpenClaw](https://github.com/OpenClaw) – The AI agent runtime
 - [Electron](https://www.electronjs.org/) – Cross-platform desktop framework
@@ -373,7 +373,7 @@ Join our community to connect with other users, get support, and share your expe
 
 ## License
 
-ClawX is released under the [MIT License](LICENSE). You're free to use, modify, and distribute this software.
+OClaw is released under the [MIT License](LICENSE). You're free to use, modify, and distribute this software.
 
 ---
 

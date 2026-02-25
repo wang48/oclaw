@@ -15,7 +15,7 @@ import { warmupNetworkOptimization } from '../utils/uv-env';
 import { runCli } from './cli';
 
 import { ClawHubService } from '../gateway/clawhub';
-import { ensureClawXContext } from '../utils/openclaw-workspace';
+import { ensureOClawContext } from '../utils/openclaw-workspace';
 
 // Disable GPU acceleration for better compatibility
 app.disableHardwareAcceleration();
@@ -109,7 +109,7 @@ function createWindow(): BrowserWindow {
 async function initialize(): Promise<void> {
   // Initialize logger first
   logger.init();
-  logger.info('=== ClawX Application Starting ===');
+  logger.info('=== OClaw Application Starting ===');
   logger.debug(
     `Runtime: platform=${process.platform}/${process.arch}, electron=${process.versions.electron}, node=${process.versions.node}, packaged=${app.isPackaged}`
   );
@@ -130,8 +130,8 @@ async function initialize(): Promise<void> {
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['https://openrouter.ai/*'] },
     (details, callback) => {
-      details.requestHeaders['HTTP-Referer'] = 'https://claw-x.com';
-      details.requestHeaders['X-Title'] = 'ClawX';
+      details.requestHeaders['HTTP-Referer'] = 'https://github.com/wang48/oclaw';
+      details.requestHeaders['X-Title'] = 'OClaw';
       callback({ requestHeaders: details.requestHeaders });
     },
   );
@@ -182,11 +182,11 @@ async function initialize(): Promise<void> {
     mainWindow = null;
   });
 
-  // Merge ClawX context snippets into the openclaw workspace bootstrap files
+  // Merge OClaw context snippets into the openclaw workspace bootstrap files
   try {
-    ensureClawXContext();
+    ensureOClawContext();
   } catch (error) {
-    logger.warn('Failed to merge ClawX context into workspace:', error);
+    logger.warn('Failed to merge OClaw context into workspace:', error);
   }
 
   // Start Gateway automatically
