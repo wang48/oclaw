@@ -283,6 +283,36 @@ pnpm package:win          # Package for Windows
 pnpm package:linux        # Package for Linux
 ```
 
+### CLI Mode
+
+ClawX now supports a command-line mode from the same executable:
+
+```bash
+# General
+ClawX --cli help
+ClawX --cli status
+
+# Gateway / RPC
+ClawX --cli gateway start
+ClawX --cli gateway rpc sessions.list '{"limit":50}'
+
+# Provider / Channel / Cron
+ClawX --cli provider list
+ClawX --cli channel list
+ClawX --cli cron list
+```
+
+Available command groups:
+- `openclaw`
+- `gateway`
+- `provider`
+- `channel`
+- `skill`
+- `cron`
+- `chat`
+- `clawhub`
+- `uv`
+
 ### Tech Stack
 
 | Layer | Technology |

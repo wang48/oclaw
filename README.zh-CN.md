@@ -284,6 +284,36 @@ pnpm package:win          # 为 Windows 打包
 pnpm package:linux        # 为 Linux 打包
 ```
 
+### CLI 模式
+
+ClawX 现在支持通过同一个可执行文件进入命令行模式：
+
+```bash
+# 通用
+ClawX --cli help
+ClawX --cli status
+
+# 网关 / RPC
+ClawX --cli gateway start
+ClawX --cli gateway rpc sessions.list '{"limit":50}'
+
+# Provider / Channel / Cron
+ClawX --cli provider list
+ClawX --cli channel list
+ClawX --cli cron list
+```
+
+目前支持的命令组：
+- `openclaw`
+- `gateway`
+- `provider`
+- `channel`
+- `skill`
+- `cron`
+- `chat`
+- `clawhub`
+- `uv`
+
 ### 技术栈
 
 | 层级 | 技术 |

@@ -12,6 +12,7 @@ import { createMenu } from './menu';
 import { appUpdater, registerUpdateHandlers } from './updater';
 import { logger } from '../utils/logger';
 import { warmupNetworkOptimization } from '../utils/uv-env';
+import { runCli } from './cli';
 
 import { ClawHubService } from '../gateway/clawhub';
 import { ensureClawXContext } from '../utils/openclaw-workspace';
@@ -24,6 +25,9 @@ let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 const gatewayManager = new GatewayManager();
 const clawHubService = new ClawHubService();
+const cliModeIndex = process.argv.indexOf('--cli');
+const isCliMode = cliModeIndex >= 0;
+const cliArgs = isCliMode ? process.argv.slice(cliModeIndex + 1) : [];
 
 /**
  * Resolve the icons directory path (works in both dev and packaged mode)
@@ -198,6 +202,18 @@ async function initialize(): Promise<void> {
 
 // Application lifecycle
 app.whenReady().then(() => {
+  if (isCliMode) {
+    void runCli(cliArgs)
+      .then((code) => {
+        app.exit(code);
+      })
+      .catch((error) => {
+        console.error('CLI execution failed:', error);
+        app.exit(1);
+      });
+    return;
+  }
+
   initialize();
 
   // Register activate handler AFTER app is ready to prevent
