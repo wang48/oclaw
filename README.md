@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="src/assets/logo.svg" width="128" height="128" alt="Oclaw Logo" />
+  <img src="resources/icons/icon.png" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
 <h1 align="center">Oclaw</h1>
@@ -289,17 +289,17 @@ Oclaw now supports a command-line mode from the same executable:
 
 ```bash
 # General
-Oclaw --cli help
-Oclaw --cli status
+Oclaw help
+Oclaw status
 
 # Gateway / RPC
-Oclaw --cli gateway start
-Oclaw --cli gateway rpc sessions.list '{"limit":50}'
+Oclaw gateway start
+Oclaw gateway rpc sessions.list '{"limit":50}'
 
 # Provider / Channel / Cron
-Oclaw --cli provider list
-Oclaw --cli channel list
-Oclaw --cli cron list
+Oclaw provider list
+Oclaw channel list
+Oclaw cron list
 ```
 
 Available command groups:

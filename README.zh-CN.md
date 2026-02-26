@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="src/assets/logo.svg" width="128" height="128" alt="Oclaw Logo" />
+  <img src="resources/icons/icon.png" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
 <h1 align="center">Oclaw</h1>
@@ -290,17 +290,17 @@ Oclaw 现在支持通过同一个可执行文件进入命令行模式：
 
 ```bash
 # 通用
-Oclaw --cli help
-Oclaw --cli status
+Oclaw help
+Oclaw status
 
 # 网关 / RPC
-Oclaw --cli gateway start
-Oclaw --cli gateway rpc sessions.list '{"limit":50}'
+Oclaw gateway start
+Oclaw gateway rpc sessions.list '{"limit":50}'
 
 # Provider / Channel / Cron
-Oclaw --cli provider list
-Oclaw --cli channel list
-Oclaw --cli cron list
+Oclaw provider list
+Oclaw channel list
+Oclaw cron list
 ```
 
 目前支持的命令组：
