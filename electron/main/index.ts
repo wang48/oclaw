@@ -47,9 +47,18 @@ function getIconsDir(): string {
  * Get the app icon for the current platform
  */
 function getAppIcon(): Electron.NativeImage | undefined {
-  if (process.platform === 'darwin') return undefined; // macOS uses the app bundle icon
-
   const iconsDir = getIconsDir();
+
+  // macOS: use .icns in dev mode, app bundle icon in production
+  if (process.platform === 'darwin') {
+    if (!app.isPackaged) {
+      const iconPath = join(iconsDir, 'icon.icns');
+      const icon = nativeImage.createFromPath(iconPath);
+      return icon.isEmpty() ? undefined : icon;
+    }
+    return undefined; // Packaged app uses bundle icon
+  }
+
   const iconPath =
     process.platform === 'win32'
       ? join(iconsDir, 'icon.ico')
