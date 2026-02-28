@@ -9,10 +9,10 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { createTray } from './tray';
 import { createMenu } from './menu';
 
-import { appUpdater, registerUpdateHandlers } from './updater';
 import { logger } from '../utils/logger';
 import { warmupNetworkOptimization } from '../utils/uv-env';
-import { runCli } from './cli';
+import { runCli } from './cli/index';
+import { resolveCliArgs } from './cli/args';
 
 import { ClawHubService } from '../gateway/clawhub';
 import { ensureOclawContext } from '../utils/openclaw-workspace';
@@ -23,11 +23,13 @@ app.disableHardwareAcceleration();
 // Global references
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
-const gatewayManager = new GatewayManager();
-const clawHubService = new ClawHubService();
-const cliModeIndex = process.argv.indexOf('--cli');
-const isCliMode = cliModeIndex >= 0;
-const cliArgs = isCliMode ? process.argv.slice(cliModeIndex + 1) : [];
+let gatewayManager: GatewayManager | null = null;
+let clawHubService: ClawHubService | null = null;
+// Use full argv tail to avoid launch-mode specific offsets.
+// In both packaged and defaultApp mode, real CLI tokens appear after argv[0].
+const forwardedArgs = process.argv.slice(1);
+const cliArgs = resolveCliArgs(forwardedArgs);
+const isCliMode = cliArgs.length > 0;
 
 /**
  * Resolve the icons directory path (works in both dev and packaged mode)
@@ -165,7 +167,8 @@ async function initialize(): Promise<void> {
   registerIpcHandlers(gatewayManager, clawHubService, mainWindow);
 
   // Register update handlers
-  registerUpdateHandlers(appUpdater, mainWindow);
+  const { getAppUpdater, registerUpdateHandlers } = await import('./updater');
+  registerUpdateHandlers(getAppUpdater(), mainWindow);
 
   // Note: Auto-check for updates is driven by the renderer (update store init)
   // so it respects the user's "Auto-check for updates" setting.
@@ -241,10 +244,14 @@ app.on('before-quit', () => {
   // Awaiting inside a before-quit handler can stall Electron's
   // replyToApplicationShouldTerminate: call when the quit is initiated
   // by Squirrel.Mac (quitAndInstall), preventing the app from ever exiting.
-  void gatewayManager.stop().catch((err) => {
-    logger.warn('gatewayManager.stop() error during quit:', err);
-  });
+  if (gatewayManager) {
+    void gatewayManager.stop().catch((err) => {
+      logger.warn('gatewayManager.stop() error during quit:', err);
+    });
+  }
 });
 
 // Export for testing
 export { mainWindow, gatewayManager };
+  gatewayManager = new GatewayManager();
+  clawHubService = new ClawHubService();

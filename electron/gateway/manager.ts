@@ -141,7 +141,6 @@ export class GatewayManager extends EventEmitter {
     try {
       const identityPath = path.join(app.getPath('userData'), 'oclaw-device-identity.json');
       this.deviceIdentity = loadOrCreateDeviceIdentity(identityPath);
-      logger.debug(`Device identity loaded (deviceId=${this.deviceIdentity.deviceId})`);
     } catch (err) {
       logger.warn('Failed to load device identity, scopes will be limited:', err);
     }

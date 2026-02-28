@@ -163,7 +163,7 @@ export interface OpenClawStatus {
   version?: string;
 }
 
-export function getOpenClawStatus(): OpenClawStatus {
+export function getOpenClawStatus(options?: { silent?: boolean }): OpenClawStatus {
   const dir = getOpenClawDir();
   let version: string | undefined;
 
@@ -186,6 +186,8 @@ export function getOpenClawStatus(): OpenClawStatus {
     version,
   };
 
-  logger.info('OpenClaw status:', status);
+  if (!options?.silent) {
+    logger.info('OpenClaw status:', status);
+  }
   return status;
 }

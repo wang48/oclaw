@@ -346,5 +346,11 @@ export function registerUpdateHandlers(
 
 }
 
-// Export singleton instance
-export const appUpdater = new AppUpdater();
+let appUpdaterInstance: AppUpdater | null = null;
+
+export function getAppUpdater(): AppUpdater {
+  if (!appUpdaterInstance) {
+    appUpdaterInstance = new AppUpdater();
+  }
+  return appUpdaterInstance;
+}
