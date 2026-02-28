@@ -10,6 +10,7 @@ import { autoUpdater, UpdateInfo, ProgressInfo, UpdateDownloadedEvent } from 'el
 import { BrowserWindow, app, ipcMain } from 'electron';
 import { logger } from '../utils/logger';
 import { EventEmitter } from 'events';
+import { setQuitting } from './app-state';
 
 /** Base CDN URL (without trailing channel path) */
 const OSS_BASE_URL = 'https://oss.intelli-spectrum.com';
@@ -214,6 +215,8 @@ export class AppUpdater extends EventEmitter {
    */
   quitAndInstall(): void {
     logger.info('[Updater] quitAndInstall called – invoking autoUpdater.quitAndInstall()');
+    // Set quitting flag before quitAndInstall to prevent tray from intercepting
+    setQuitting();
     // On macOS, MacUpdater.quitAndInstall() either:
     //   (a) calls nativeUpdater.quitAndInstall() immediately (Squirrel already staged), or
     //   (b) waits for Squirrel to finish staging, then calls nativeUpdater.quitAndInstall().

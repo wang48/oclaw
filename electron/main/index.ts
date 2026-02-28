@@ -16,13 +16,13 @@ import { resolveCliArgs } from './cli/args';
 
 import { ClawHubService } from '../gateway/clawhub';
 import { ensureOclawContext } from '../utils/openclaw-workspace';
+import { isQuitting, setQuitting } from './app-state';
 
 // Disable GPU acceleration for better compatibility
 app.disableHardwareAcceleration();
 
 // Global references
 let mainWindow: BrowserWindow | null = null;
-let isQuitting = false;
 let gatewayManager: GatewayManager | null = null;
 let clawHubService: ClawHubService | null = null;
 // Use full argv tail to avoid launch-mode specific offsets.
@@ -188,7 +188,7 @@ async function initialize(): Promise<void> {
 
   // Minimize to tray on close instead of quitting (macOS & Windows)
   mainWindow.on('close', (event) => {
-    if (!isQuitting) {
+    if (!isQuitting()) {
       event.preventDefault();
       mainWindow?.hide();
     }
@@ -252,7 +252,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  isQuitting = true;
+  setQuitting();
   // Fire-and-forget: do not await gatewayManager.stop() here.
   // Awaiting inside a before-quit handler can stall Electron's
   // replyToApplicationShouldTerminate: call when the quit is initiated
