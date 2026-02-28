@@ -125,6 +125,10 @@ async function initialize(): Promise<void> {
     `Runtime: platform=${process.platform}/${process.arch}, electron=${process.versions.electron}, node=${process.versions.node}, packaged=${app.isPackaged}`
   );
 
+  // Initialize gateway manager and clawhub service
+  gatewayManager = new GatewayManager();
+  clawHubService = new ClawHubService();
+
   // Warm up network optimization (non-blocking)
   void warmupNetworkOptimization();
 
@@ -262,5 +266,3 @@ app.on('before-quit', () => {
 
 // Export for testing
 export { mainWindow, gatewayManager };
-  gatewayManager = new GatewayManager();
-  clawHubService = new ClawHubService();
