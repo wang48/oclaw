@@ -3,7 +3,7 @@
  * Registers all IPC handlers for main-renderer communication
  */
 import { ipcMain, BrowserWindow, shell, dialog, app, nativeImage } from 'electron';
-import { existsSync, copyFileSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, cpSync, mkdirSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, extname, basename } from 'node:path';
 import crypto from 'node:crypto';
@@ -23,13 +23,14 @@ import {
   type ProviderConfig,
 } from '../utils/secure-storage';
 import { getOpenClawStatus, getOpenClawDir, getOpenClawConfigDir, getOpenClawSkillsDir, ensureDir } from '../utils/paths';
-import { getOpenClawCliCommand, installOpenClawCliMac } from '../utils/openclaw-cli';
+import { getOpenClawCliCommand } from '../utils/openclaw-cli';
 import { getSetting } from '../utils/store';
 import {
   saveProviderKeyToOpenClaw,
-  removeProviderKeyFromOpenClaw,
+  removeProviderFromOpenClaw,
   setOpenClawDefaultModel,
   setOpenClawDefaultModelWithOverride,
+  syncProviderConfigToOpenClaw,
   updateAgentModelProvider,
 } from '../utils/openclaw-auth';
 import { logger } from '../utils/logger';
@@ -47,6 +48,27 @@ import { checkUvInstalled, installUv, setupManagedPython } from '../utils/uv-set
 import { updateSkillConfig, getSkillConfig, getAllSkillConfigs } from '../utils/skill-config';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { getProviderConfig } from '../utils/provider-registry';
+import { deviceOAuthManager, OAuthProviderType } from '../utils/device-oauth';
+
+/**
+ * For custom/ollama providers, derive a unique key for OpenClaw config files
+ * so that multiple instances of the same type don't overwrite each other.
+ * For all other providers the key is simply the provider type.
+ *
+ * @param type - Provider type (e.g. 'custom', 'ollama', 'openrouter')
+ * @param providerId - Unique provider ID from secure-storage (UUID-like)
+ * @returns A string like 'custom-a1b2c3d4' or 'openrouter'
+ */
+export function getOpenClawProviderKey(type: string, providerId: string): string {
+  if (type === 'custom' || type === 'ollama') {
+    const suffix = providerId.replace(/-/g, '').slice(0, 8);
+    return `${type}-${suffix}`;
+  }
+  if (type === 'minimax-portal-cn') {
+    return 'minimax-portal';
+  }
+  return type;
+}
 
 /**
  * Register all IPC handlers
@@ -63,7 +85,7 @@ export function registerIpcHandlers(
   registerClawHubHandlers(clawHubService);
 
   // OpenClaw handlers
-  registerOpenClawHandlers();
+  registerOpenClawHandlers(gatewayManager);
 
   // Provider handlers
   registerProviderHandlers(gatewayManager);
@@ -95,6 +117,9 @@ export function registerIpcHandlers(
   // WhatsApp handlers
   registerWhatsAppHandlers(mainWindow);
 
+  // Device OAuth handlers (Code Plan)
+  registerDeviceOAuthHandlers(mainWindow);
+
   // File staging handlers (upload/send separation)
   registerFileHandlers();
 }
@@ -110,7 +135,7 @@ function registerSkillConfigHandlers(): void {
     apiKey?: string;
     env?: Record<string, string>;
   }) => {
-    return updateSkillConfig(params.skillKey, {
+    return await updateSkillConfig(params.skillKey, {
       apiKey: params.apiKey,
       env: params.env,
     });
@@ -118,12 +143,12 @@ function registerSkillConfigHandlers(): void {
 
   // Get skill config
   ipcMain.handle('skill:getConfig', async (_, skillKey: string) => {
-    return getSkillConfig(skillKey);
+    return await getSkillConfig(skillKey);
   });
 
   // Get all skill configs
   ipcMain.handle('skill:getAllConfigs', async () => {
-    return getAllSkillConfigs();
+    return await getAllSkillConfigs();
   });
 }
 
@@ -140,6 +165,7 @@ interface GatewayCronJob {
   schedule: { kind: string; expr?: string; everyMs?: number; at?: string; tz?: string };
   payload: { kind: string; message?: string; text?: string };
   delivery?: { mode: string; channel?: string; to?: string };
+  sessionTarget?: string;
   state: {
     nextRunAtMs?: number;
     lastRunAtMs?: number;
@@ -156,13 +182,11 @@ function transformCronJob(job: GatewayCronJob) {
   // Extract message from payload
   const message = job.payload?.message || job.payload?.text || '';
 
-  // Build target from delivery info
-  const channelType = job.delivery?.channel || 'unknown';
-  const target = {
-    channelType,
-    channelId: channelType,
-    channelName: channelType,
-  };
+  // Build target from delivery info — only if a delivery channel is specified
+  const channelType = job.delivery?.channel;
+  const target = channelType
+    ? { channelType, channelId: channelType, channelName: channelType }
+    : undefined;
 
   // Build lastRun from state
   const lastRun = job.state?.lastRunAtMs
@@ -207,6 +231,38 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
       const result = await gatewayManager.rpc('cron.list', { includeDisabled: true });
       const data = result as { jobs?: GatewayCronJob[] };
       const jobs = data?.jobs ?? [];
+
+      // Auto-repair legacy UI-created jobs that were saved without
+      // delivery: { mode: 'none' }.  The Gateway auto-normalizes them
+      // to delivery: { mode: 'announce' } which then fails with
+      // "Channel is required" when no external channels are configured.
+      for (const job of jobs) {
+        const isIsolatedAgent =
+          (job.sessionTarget === 'isolated' || !job.sessionTarget) &&
+          job.payload?.kind === 'agentTurn';
+        const needsRepair =
+          isIsolatedAgent &&
+          job.delivery?.mode === 'announce' &&
+          !job.delivery?.channel;
+
+        if (needsRepair) {
+          try {
+            await gatewayManager.rpc('cron.update', {
+              id: job.id,
+              patch: { delivery: { mode: 'none' } },
+            });
+            job.delivery = { mode: 'none' };
+            // Clear stale channel-resolution error from the last run
+            if (job.state?.lastError?.includes('Channel is required')) {
+              job.state.lastError = undefined;
+              job.state.lastStatus = 'ok';
+            }
+          } catch (e) {
+            console.warn(`Failed to auto-repair cron job ${job.id}:`, e);
+          }
+        }
+      }
+
       // Transform Gateway format to frontend format
       return jobs.map(transformCronJob);
     } catch (error) {
@@ -216,21 +272,16 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
   });
 
   // Create a new cron job
+  // UI-created tasks have no delivery target — results go to the Oclaw chat page.
+  // Tasks created via external channels (Feishu, Discord, etc.) are handled
+  // directly by the OpenClaw Gateway and do not pass through this IPC handler.
   ipcMain.handle('cron:create', async (_, input: {
     name: string;
     message: string;
     schedule: string;
-    target: { channelType: string; channelId: string; channelName: string };
     enabled?: boolean;
   }) => {
     try {
-      // Transform frontend input to Gateway cron.add format
-      // For Discord, the recipient must be prefixed with "channel:" or "user:"
-      const recipientId = input.target.channelId;
-      const deliveryTo = input.target.channelType === 'discord' && recipientId
-        ? `channel:${recipientId}`
-        : recipientId;
-
       const gatewayInput = {
         name: input.name,
         schedule: { kind: 'cron', expr: input.schedule },
@@ -238,11 +289,11 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
         enabled: input.enabled ?? true,
         wakeMode: 'next-heartbeat',
         sessionTarget: 'isolated',
-        delivery: {
-          mode: 'announce',
-          channel: input.target.channelType,
-          to: deliveryTo,
-        },
+        // UI-created jobs deliver results via Oclaw WebSocket chat events,
+        // not external messaging channels.  Setting mode='none' prevents
+        // the Gateway from attempting channel delivery (which would fail
+        // with "Channel is required" when no channels are configured).
+        delivery: { mode: 'none' },
       };
       const result = await gatewayManager.rpc('cron.add', gatewayInput);
       // Transform the returned job to frontend format
@@ -349,7 +400,7 @@ function registerLogHandlers(): void {
 
   // Read log file content (last N lines)
   ipcMain.handle('log:readFile', async (_, tailLines?: number) => {
-    return logger.readLogFile(tailLines);
+    return await logger.readLogFile(tailLines);
   });
 
   // Get log file path (so user can open in file explorer)
@@ -364,7 +415,7 @@ function registerLogHandlers(): void {
 
   // List all log files
   ipcMain.handle('log:listFiles', async () => {
-    return logger.listLogFiles();
+    return await logger.listLogFiles();
   });
 }
 
@@ -454,8 +505,10 @@ function registerGatewayHandlers(
       const fileReferences: string[] = [];
 
       if (params.media && params.media.length > 0) {
+        const fsP = await import('fs/promises');
         for (const m of params.media) {
-          logger.info(`[chat:sendWithMedia] Processing file: ${m.fileName} (${m.mimeType}), path: ${m.filePath}, exists: ${existsSync(m.filePath)}, isVision: ${VISION_MIME_TYPES.has(m.mimeType)}`);
+          const exists = await fsP.access(m.filePath).then(() => true, () => false);
+          logger.info(`[chat:sendWithMedia] Processing file: ${m.fileName} (${m.mimeType}), path: ${m.filePath}, exists: ${exists}, isVision: ${VISION_MIME_TYPES.has(m.mimeType)}`);
 
           // Always add file path reference so the model can access it via tools
           fileReferences.push(
@@ -466,7 +519,7 @@ function registerGatewayHandlers(
             // Send as base64 attachment in the format the Gateway expects:
             // { content: base64String, mimeType: string, fileName?: string }
             // The Gateway normalizer looks for `a.content` (NOT `a.source.data`).
-            const fileBuffer = readFileSync(m.filePath);
+            const fileBuffer = await fsP.readFile(m.filePath);
             const base64Data = fileBuffer.toString('base64');
             logger.info(`[chat:sendWithMedia] Read ${fileBuffer.length} bytes, base64 length: ${base64Data.length}`);
             imageAttachments.push({
@@ -580,7 +633,56 @@ function registerGatewayHandlers(
  * OpenClaw-related IPC handlers
  * For checking package status and channel configuration
  */
-function registerOpenClawHandlers(): void {
+function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
+  async function ensureDingTalkPluginInstalled(): Promise<{ installed: boolean; warning?: string }> {
+    const targetDir = join(homedir(), '.openclaw', 'extensions', 'dingtalk');
+    const targetManifest = join(targetDir, 'openclaw.plugin.json');
+
+    if (existsSync(targetManifest)) {
+      logger.info('DingTalk plugin already installed from local mirror');
+      return { installed: true };
+    }
+
+    const candidateSources = app.isPackaged
+      ? [
+        join(process.resourcesPath, 'openclaw-plugins', 'dingtalk'),
+        join(process.resourcesPath, 'app.asar.unpacked', 'build', 'openclaw-plugins', 'dingtalk'),
+        join(process.resourcesPath, 'app.asar.unpacked', 'openclaw-plugins', 'dingtalk')
+      ]
+      : [
+        join(app.getAppPath(), 'build', 'openclaw-plugins', 'dingtalk'),
+        join(process.cwd(), 'build', 'openclaw-plugins', 'dingtalk'),
+        join(__dirname, '../../build/openclaw-plugins/dingtalk'),
+      ];
+
+    const sourceDir = candidateSources.find((dir) => existsSync(join(dir, 'openclaw.plugin.json')));
+    if (!sourceDir) {
+      logger.warn('Bundled DingTalk plugin mirror not found in candidate paths', { candidateSources });
+      return {
+        installed: false,
+        warning: `Bundled DingTalk plugin mirror not found. Checked: ${candidateSources.join(' | ')}`,
+      };
+    }
+
+    try {
+      mkdirSync(join(homedir(), '.openclaw', 'extensions'), { recursive: true });
+      rmSync(targetDir, { recursive: true, force: true });
+      cpSync(sourceDir, targetDir, { recursive: true, dereference: true });
+
+      if (!existsSync(targetManifest)) {
+        return { installed: false, warning: 'Failed to install DingTalk plugin mirror (manifest missing).' };
+      }
+
+      logger.info(`Installed DingTalk plugin from bundled mirror: ${sourceDir}`);
+      return { installed: true };
+    } catch (error) {
+      logger.warn('Failed to install DingTalk plugin from bundled mirror:', error);
+      return {
+        installed: false,
+        warning: 'Failed to install bundled DingTalk plugin mirror',
+      };
+    }
+  }
 
   // Get OpenClaw package status
   ipcMain.handle('openclaw:status', () => {
@@ -628,10 +730,6 @@ function registerOpenClawHandlers(): void {
     }
   });
 
-  // Install a system-wide openclaw command on macOS (requires admin prompt)
-  ipcMain.handle('openclaw:installCliMac', async () => {
-    return installOpenClawCliMac();
-  });
 
   // ==================== Channel Configuration Handlers ====================
 
@@ -639,7 +737,25 @@ function registerOpenClawHandlers(): void {
   ipcMain.handle('channel:saveConfig', async (_, channelType: string, config: Record<string, unknown>) => {
     try {
       logger.info('channel:saveConfig', { channelType, keys: Object.keys(config || {}) });
-      saveChannelConfig(channelType, config);
+      if (channelType === 'dingtalk') {
+        const installResult = await ensureDingTalkPluginInstalled();
+        if (!installResult.installed) {
+          return {
+            success: false,
+            error: installResult.warning || 'DingTalk plugin install failed',
+          };
+        }
+        await saveChannelConfig(channelType, config);
+        gatewayManager.debouncedRestart();
+        return {
+          success: true,
+          pluginInstalled: installResult.installed,
+          warning: installResult.warning,
+        };
+      }
+      await saveChannelConfig(channelType, config);
+      // Debounced restart so the gateway picks up the new channel config.
+      gatewayManager.debouncedRestart();
       return { success: true };
     } catch (error) {
       console.error('Failed to save channel config:', error);
@@ -650,7 +766,7 @@ function registerOpenClawHandlers(): void {
   // Get channel configuration
   ipcMain.handle('channel:getConfig', async (_, channelType: string) => {
     try {
-      const config = getChannelConfig(channelType);
+      const config = await getChannelConfig(channelType);
       return { success: true, config };
     } catch (error) {
       console.error('Failed to get channel config:', error);
@@ -661,7 +777,7 @@ function registerOpenClawHandlers(): void {
   // Get channel form values (reverse-transformed for UI pre-fill)
   ipcMain.handle('channel:getFormValues', async (_, channelType: string) => {
     try {
-      const values = getChannelFormValues(channelType);
+      const values = await getChannelFormValues(channelType);
       return { success: true, values };
     } catch (error) {
       console.error('Failed to get channel form values:', error);
@@ -672,7 +788,7 @@ function registerOpenClawHandlers(): void {
   // Delete channel configuration
   ipcMain.handle('channel:deleteConfig', async (_, channelType: string) => {
     try {
-      deleteChannelConfig(channelType);
+      await deleteChannelConfig(channelType);
       return { success: true };
     } catch (error) {
       console.error('Failed to delete channel config:', error);
@@ -683,7 +799,7 @@ function registerOpenClawHandlers(): void {
   // List configured channels
   ipcMain.handle('channel:listConfigured', async () => {
     try {
-      const channels = listConfiguredChannels();
+      const channels = await listConfiguredChannels();
       return { success: true, channels };
     } catch (error) {
       console.error('Failed to list channels:', error);
@@ -694,7 +810,7 @@ function registerOpenClawHandlers(): void {
   // Enable or disable a channel
   ipcMain.handle('channel:setEnabled', async (_, channelType: string, enabled: boolean) => {
     try {
-      setChannelEnabled(channelType, enabled);
+      await setChannelEnabled(channelType, enabled);
       return { success: true };
     } catch (error) {
       console.error('Failed to set channel enabled:', error);
@@ -777,11 +893,46 @@ function registerWhatsAppHandlers(mainWindow: BrowserWindow): void {
   });
 }
 
+/**
+ * Device OAuth Handlers (Code Plan)
+ */
+function registerDeviceOAuthHandlers(mainWindow: BrowserWindow): void {
+  deviceOAuthManager.setWindow(mainWindow);
+
+  // Request Provider OAuth initialization
+  ipcMain.handle('provider:requestOAuth', async (_, provider: OAuthProviderType, region?: 'global' | 'cn') => {
+    try {
+      logger.info(`provider:requestOAuth for ${provider}`);
+      await deviceOAuthManager.startFlow(provider, region);
+      return { success: true };
+    } catch (error) {
+      logger.error('provider:requestOAuth failed', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // Cancel Provider OAuth
+  ipcMain.handle('provider:cancelOAuth', async () => {
+    try {
+      await deviceOAuthManager.stopFlow();
+      return { success: true };
+    } catch (error) {
+      logger.error('provider:cancelOAuth failed', error);
+      return { success: false, error: String(error) };
+    }
+  });
+}
 
 /**
  * Provider-related IPC handlers
  */
 function registerProviderHandlers(gatewayManager: GatewayManager): void {
+  // Listen for OAuth success to automatically restart the Gateway with new tokens/configs
+  deviceOAuthManager.on('oauth:success', (providerType) => {
+    logger.info(`[IPC] Scheduling Gateway restart after ${providerType} OAuth success...`);
+    gatewayManager.debouncedRestart();
+  });
+
   // Get all providers with key info
   ipcMain.handle('provider:list', async () => {
     return await getAllProvidersWithKeyInfo();
@@ -798,16 +949,59 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       // Save the provider config
       await saveProvider(config);
 
-      // Store the API key if provided
-      if (apiKey) {
-        await storeApiKey(config.id, apiKey);
+      // Derive the unique OpenClaw key for this provider instance
+      const ock = getOpenClawProviderKey(config.type, config.id);
 
-        // Also write to OpenClaw auth-profiles.json so the gateway can use it
-        try {
-          saveProviderKeyToOpenClaw(config.type, apiKey);
-        } catch (err) {
-          console.warn('Failed to save key to OpenClaw auth-profiles:', err);
+      // Store the API key if provided
+      if (apiKey !== undefined) {
+        const trimmedKey = apiKey.trim();
+        if (trimmedKey) {
+          await storeApiKey(config.id, trimmedKey);
+
+          // Also write to OpenClaw auth-profiles.json so the gateway can use it
+          try {
+            await saveProviderKeyToOpenClaw(ock, trimmedKey);
+          } catch (err) {
+            console.warn('Failed to save key to OpenClaw auth-profiles:', err);
+          }
         }
+      }
+
+      // Sync the provider configuration to openclaw.json so Gateway knows about it
+      try {
+        const meta = getProviderConfig(config.type);
+        const api = config.type === 'custom' || config.type === 'ollama' ? 'openai-completions' : meta?.api;
+
+        if (api) {
+          await syncProviderConfigToOpenClaw(ock, config.model, {
+            baseUrl: config.baseUrl || meta?.baseUrl,
+            api,
+            apiKeyEnv: meta?.apiKeyEnv,
+            headers: meta?.headers,
+          });
+
+          if (config.type === 'custom' || config.type === 'ollama') {
+            const resolvedKey = apiKey !== undefined
+              ? (apiKey.trim() || null)
+              : await getApiKey(config.id);
+            if (resolvedKey && config.baseUrl) {
+              const modelId = config.model;
+              await updateAgentModelProvider(ock, {
+                baseUrl: config.baseUrl,
+                api: 'openai-completions',
+                models: modelId ? [{ id: modelId, name: modelId }] : [],
+                apiKey: resolvedKey,
+              });
+            }
+          }
+
+          // Debounced restart so the gateway picks up new config/env vars.
+          // Multiple rapid provider saves (e.g. during setup) are coalesced.
+          logger.info(`Scheduling Gateway restart after saving provider "${ock}" config`);
+          gatewayManager.debouncedRestart();
+        }
+      } catch (err) {
+        console.warn('Failed to sync openclaw provider config:', err);
       }
 
       return { success: true };
@@ -822,12 +1016,17 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       const existing = await getProvider(providerId);
       await deleteProvider(providerId);
 
-      // Best-effort cleanup in OpenClaw auth profiles
+      // Best-effort cleanup in OpenClaw auth profiles & openclaw.json config
       if (existing?.type) {
         try {
-          removeProviderKeyFromOpenClaw(existing.type);
+          const ock = getOpenClawProviderKey(existing.type, providerId);
+          await removeProviderFromOpenClaw(ock);
+
+          // Debounced restart so the gateway stops loading the deleted provider.
+          logger.info(`Scheduling Gateway restart after deleting provider "${ock}"`);
+          gatewayManager.debouncedRestart();
         } catch (err) {
-          console.warn('Failed to remove key from OpenClaw auth-profiles:', err);
+          console.warn('Failed to completely remove provider from OpenClaw:', err);
         }
       }
 
@@ -843,11 +1042,11 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       await storeApiKey(providerId, apiKey);
 
       // Also write to OpenClaw auth-profiles.json
-      // Resolve provider type from stored config, or use providerId as type
       const provider = await getProvider(providerId);
       const providerType = provider?.type || providerId;
+      const ock = getOpenClawProviderKey(providerType, providerId);
       try {
-        saveProviderKeyToOpenClaw(providerType, apiKey);
+        await saveProviderKeyToOpenClaw(ock, apiKey);
       } catch (err) {
         console.warn('Failed to save key to OpenClaw auth-profiles:', err);
       }
@@ -873,7 +1072,7 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       }
 
       const previousKey = await getApiKey(providerId);
-      const previousProviderType = existing.type;
+      const previousOck = getOpenClawProviderKey(existing.type, providerId);
 
       try {
         const nextConfig: ProviderConfig = {
@@ -882,54 +1081,71 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
           updatedAt: new Date().toISOString(),
         };
 
+        const ock = getOpenClawProviderKey(nextConfig.type, providerId);
+
         await saveProvider(nextConfig);
 
         if (apiKey !== undefined) {
           const trimmedKey = apiKey.trim();
           if (trimmedKey) {
             await storeApiKey(providerId, trimmedKey);
-            saveProviderKeyToOpenClaw(nextConfig.type, trimmedKey);
+            await saveProviderKeyToOpenClaw(ock, trimmedKey);
           } else {
             await deleteApiKey(providerId);
-            removeProviderKeyFromOpenClaw(nextConfig.type);
+            await removeProviderFromOpenClaw(ock);
           }
         }
 
-        // If this provider is the current default, propagate model/baseUrl
-        // changes to openclaw.json and models.json immediately so the gateway
-        // picks them up without requiring the user to re-activate the provider.
-        const defaultProviderId = await getDefaultProvider();
-        if (defaultProviderId === providerId) {
-          try {
-            const modelOverride = nextConfig.model
-              ? `${nextConfig.type}/${nextConfig.model}`
-              : undefined;
+        // Sync the provider configuration to openclaw.json so Gateway knows about it
+        try {
+          const meta = getProviderConfig(nextConfig.type);
+          const api = nextConfig.type === 'custom' || nextConfig.type === 'ollama' ? 'openai-completions' : meta?.api;
+
+          if (api) {
+            await syncProviderConfigToOpenClaw(ock, nextConfig.model, {
+              baseUrl: nextConfig.baseUrl || meta?.baseUrl,
+              api,
+              apiKeyEnv: meta?.apiKeyEnv,
+              headers: meta?.headers,
+            });
+
             if (nextConfig.type === 'custom' || nextConfig.type === 'ollama') {
-              setOpenClawDefaultModelWithOverride(nextConfig.type, modelOverride, {
-                baseUrl: nextConfig.baseUrl,
-                api: 'openai-completions',
-              });
-              // Also update per-agent models.json so the gateway sees the
-              // change immediately (baseUrl or model ID may have changed).
-              const resolvedKey =
-                apiKey !== undefined
-                  ? apiKey.trim() || null
-                  : await getApiKey(providerId);
+              const resolvedKey = apiKey !== undefined
+                ? (apiKey.trim() || null)
+                : await getApiKey(providerId);
               if (resolvedKey && nextConfig.baseUrl) {
                 const modelId = nextConfig.model;
-                updateAgentModelProvider(nextConfig.type, {
+                await updateAgentModelProvider(ock, {
                   baseUrl: nextConfig.baseUrl,
                   api: 'openai-completions',
                   models: modelId ? [{ id: modelId, name: modelId }] : [],
                   apiKey: resolvedKey,
                 });
               }
-            } else {
-              setOpenClawDefaultModel(nextConfig.type, modelOverride);
             }
-          } catch (err) {
-            console.warn('Failed to sync openclaw config after provider update:', err);
           }
+
+          // If this provider is the current default, update the primary model
+          const defaultProviderId = await getDefaultProvider();
+          if (defaultProviderId === providerId) {
+            const modelOverride = nextConfig.model
+              ? `${ock}/${nextConfig.model}`
+              : undefined;
+            if (nextConfig.type !== 'custom' && nextConfig.type !== 'ollama') {
+              await setOpenClawDefaultModel(nextConfig.type, modelOverride);
+            } else {
+              await setOpenClawDefaultModelWithOverride(ock, modelOverride, {
+                baseUrl: nextConfig.baseUrl,
+                api: 'openai-completions',
+              });
+            }
+          }
+
+          // Debounced restart so the gateway picks up updated config/env vars.
+          logger.info(`Scheduling Gateway restart after updating provider "${ock}" config`);
+          gatewayManager.debouncedRestart();
+        } catch (err) {
+          console.warn('Failed to sync openclaw config after provider update:', err);
         }
 
         return { success: true };
@@ -939,10 +1155,10 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
           await saveProvider(existing);
           if (previousKey) {
             await storeApiKey(providerId, previousKey);
-            saveProviderKeyToOpenClaw(previousProviderType, previousKey);
+            await saveProviderKeyToOpenClaw(previousOck, previousKey);
           } else {
             await deleteApiKey(providerId);
-            removeProviderKeyFromOpenClaw(previousProviderType);
+            await removeProviderFromOpenClaw(previousOck);
           }
         } catch (rollbackError) {
           console.warn('Failed to rollback provider updateWithKey:', rollbackError);
@@ -961,10 +1177,13 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       // Keep OpenClaw auth-profiles.json in sync with local key storage
       const provider = await getProvider(providerId);
       const providerType = provider?.type || providerId;
+      const ock = getOpenClawProviderKey(providerType, providerId);
       try {
-        removeProviderKeyFromOpenClaw(providerType);
+        if (ock) {
+          await removeProviderFromOpenClaw(ock);
+        }
       } catch (err) {
-        console.warn('Failed to remove key from OpenClaw auth-profiles:', err);
+        console.warn('Failed to completely remove provider from OpenClaw:', err);
       }
 
       return { success: true };
@@ -992,43 +1211,90 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       const provider = await getProvider(providerId);
       if (provider) {
         try {
-          // If the provider has a user-specified model (e.g. siliconflow),
-          // build the full model string: "providerType/modelId"
-          const modelOverride = provider.model
-            ? `${provider.type}/${provider.model}`
-            : undefined;
-
-          if (provider.type === 'custom' || provider.type === 'ollama') {
-            // For runtime-configured providers, use user-entered base URL/api.
-            // Do NOT set apiKeyEnv — the OpenClaw gateway resolves custom
-            // provider keys via auth-profiles, not the config apiKey field.
-            setOpenClawDefaultModelWithOverride(provider.type, modelOverride, {
-              baseUrl: provider.baseUrl,
-              api: 'openai-completions',
-            });
-          } else {
-            setOpenClawDefaultModel(provider.type, modelOverride);
-          }
-
-          // Keep auth-profiles in sync with the default provider instance.
-          // This is especially important when multiple custom providers exist.
+          const ock = getOpenClawProviderKey(provider.type, providerId);
           const providerKey = await getApiKey(providerId);
-          if (providerKey) {
-            saveProviderKeyToOpenClaw(provider.type, providerKey);
+
+          // OAuth providers (qwen-portal, minimax-portal, minimax-portal-cn) might use OAuth OR a direct API key.
+          // Treat them as OAuth only if they don't have a local API key configured.
+          const OAUTH_PROVIDER_TYPES = ['qwen-portal', 'minimax-portal', 'minimax-portal-cn'];
+          const isOAuthProvider = OAUTH_PROVIDER_TYPES.includes(provider.type) && !providerKey;
+
+          if (!isOAuthProvider) {
+            // Build the full model string: "openclawKey/modelId"
+            const modelOverride = provider.model
+              ? (provider.model.startsWith(`${ock}/`)
+                ? provider.model
+                : `${ock}/${provider.model}`)
+              : undefined;
+
+            if (provider.type === 'custom' || provider.type === 'ollama') {
+              await setOpenClawDefaultModelWithOverride(ock, modelOverride, {
+                baseUrl: provider.baseUrl,
+                api: 'openai-completions',
+              });
+            } else {
+              await setOpenClawDefaultModel(provider.type, modelOverride);
+            }
+
+            // Keep auth-profiles in sync with the default provider instance.
+            if (providerKey) {
+              await saveProviderKeyToOpenClaw(ock, providerKey);
+            }
+          } else {
+            // OAuth providers (minimax-portal, minimax-portal-cn, qwen-portal)
+            const defaultBaseUrl = provider.type === 'minimax-portal'
+              ? 'https://api.minimax.io/anthropic'
+              : (provider.type === 'minimax-portal-cn' ? 'https://api.minimaxi.com/anthropic' : 'https://portal.qwen.ai/v1');
+            const api: 'anthropic-messages' | 'openai-completions' =
+              (provider.type === 'minimax-portal' || provider.type === 'minimax-portal-cn')
+                ? 'anthropic-messages'
+                : 'openai-completions';
+
+            let baseUrl = provider.baseUrl || defaultBaseUrl;
+            if ((provider.type === 'minimax-portal' || provider.type === 'minimax-portal-cn') && baseUrl) {
+              baseUrl = baseUrl.replace(/\/v1$/, '').replace(/\/anthropic$/, '').replace(/\/$/, '') + '/anthropic';
+            }
+
+            // To ensure the OpenClaw Gateway's internal token refresher works,
+            // we must save the CN provider under the "minimax-portal" key in openclaw.json
+            const targetProviderKey = (provider.type === 'minimax-portal' || provider.type === 'minimax-portal-cn')
+              ? 'minimax-portal'
+              : provider.type;
+
+            await setOpenClawDefaultModelWithOverride(targetProviderKey, undefined, {
+              baseUrl,
+              api,
+              authHeader: targetProviderKey === 'minimax-portal' ? true : undefined,
+              // Relies on OpenClaw Gateway native auth-profiles syncing
+              apiKeyEnv: targetProviderKey === 'minimax-portal' ? 'minimax-oauth' : 'qwen-oauth',
+            });
+
+            logger.info(`Configured openclaw.json for OAuth provider "${provider.type}"`);
+
+            // Also write models.json directly so pi-ai picks up the correct baseUrl and
+            // authHeader immediately, without waiting for Gateway to sync openclaw.json.
+            try {
+              const defaultModelId = provider.model?.split('/').pop();
+              await updateAgentModelProvider(targetProviderKey, {
+                baseUrl,
+                api,
+                authHeader: targetProviderKey === 'minimax-portal' ? true : undefined,
+                apiKey: targetProviderKey === 'minimax-portal' ? 'minimax-oauth' : 'qwen-oauth',
+                models: defaultModelId ? [{ id: defaultModelId, name: defaultModelId }] : [],
+              });
+            } catch (err) {
+              logger.warn(`Failed to update models.json for OAuth provider "${targetProviderKey}":`, err);
+            }
           }
 
           // For custom/ollama providers, also update the per-agent models.json
-          // so the gateway picks up the new baseUrl + key immediately.
-          // The gateway caches provider configs in models.json and reads from
-          // there at request time; updating openclaw.json alone is not enough
-          // when switching between multiple custom provider instances.
           if (
             (provider.type === 'custom' || provider.type === 'ollama') &&
             providerKey &&
             provider.baseUrl
           ) {
             const modelId = provider.model;
-            updateAgentModelProvider(provider.type, {
+            await updateAgentModelProvider(ock, {
               baseUrl: provider.baseUrl,
               api: 'openai-completions',
               models: modelId ? [{ id: modelId, name: modelId }] : [],
@@ -1036,14 +1302,10 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
             });
           }
 
-          // Restart Gateway so it picks up the new config and env vars.
-          // OpenClaw reads openclaw.json per-request, but env vars (API keys)
-          // are only available if they were injected at process startup.
+          // Debounced restart so the gateway picks up the new default provider.
           if (gatewayManager.isConnected()) {
-            logger.info(`Restarting Gateway after provider switch to "${provider.type}"`);
-            void gatewayManager.restart().catch((err) => {
-              logger.warn('Gateway restart after provider switch failed:', err);
-            });
+            logger.info(`Scheduling Gateway restart after provider switch to "${ock}"`);
+            gatewayManager.debouncedRestart();
           }
         } catch (err) {
           console.warn('Failed to set OpenClaw default model:', err);
@@ -1055,6 +1317,8 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       return { success: false, error: String(error) };
     }
   });
+
+
 
   // Get default provider
   ipcMain.handle('provider:getDefault', async () => {
@@ -1575,7 +1839,7 @@ const OUTBOUND_DIR = join(homedir(), '.openclaw', 'media', 'outbound');
  * longer side so the image is never squished). The frontend handles
  * square cropping via CSS object-fit: cover.
  */
-function generateImagePreview(filePath: string, mimeType: string): string | null {
+async function generateImagePreview(filePath: string, mimeType: string): Promise<string | null> {
   try {
     const img = nativeImage.createFromPath(filePath);
     if (img.isEmpty()) return null;
@@ -1588,8 +1852,9 @@ function generateImagePreview(filePath: string, mimeType: string): string | null
         : img.resize({ height: maxDim }); // portrait → constrain height
       return `data:image/png;base64,${resized.toPNG().toString('base64')}`;
     }
-    // Small image — use original
-    const buf = readFileSync(filePath);
+    // Small image — use original (async read to avoid blocking)
+    const { readFile: readFileAsync } = await import('fs/promises');
+    const buf = await readFileAsync(filePath);
     return `data:${mimeType};base64,${buf.toString('base64')}`;
   } catch {
     return null;
@@ -1603,26 +1868,27 @@ function generateImagePreview(filePath: string, mimeType: string): string | null
 function registerFileHandlers(): void {
   // Stage files from real disk paths (used with dialog:open)
   ipcMain.handle('file:stage', async (_, filePaths: string[]) => {
-    mkdirSync(OUTBOUND_DIR, { recursive: true });
+    const fsP = await import('fs/promises');
+    await fsP.mkdir(OUTBOUND_DIR, { recursive: true });
 
     const results = [];
     for (const filePath of filePaths) {
       const id = crypto.randomUUID();
       const ext = extname(filePath);
       const stagedPath = join(OUTBOUND_DIR, `${id}${ext}`);
-      copyFileSync(filePath, stagedPath);
+      await fsP.copyFile(filePath, stagedPath);
 
-      const stat = statSync(stagedPath);
+      const s = await fsP.stat(stagedPath);
       const mimeType = getMimeType(ext);
       const fileName = basename(filePath);
 
       // Generate preview for images
       let preview: string | null = null;
       if (mimeType.startsWith('image/')) {
-        preview = generateImagePreview(stagedPath, mimeType);
+        preview = await generateImagePreview(stagedPath, mimeType);
       }
 
-      results.push({ id, fileName, mimeType, fileSize: stat.size, stagedPath, preview });
+      results.push({ id, fileName, mimeType, fileSize: s.size, stagedPath, preview });
     }
     return results;
   });
@@ -1633,13 +1899,14 @@ function registerFileHandlers(): void {
     fileName: string;
     mimeType: string;
   }) => {
-    mkdirSync(OUTBOUND_DIR, { recursive: true });
+    const fsP = await import('fs/promises');
+    await fsP.mkdir(OUTBOUND_DIR, { recursive: true });
 
     const id = crypto.randomUUID();
     const ext = extname(payload.fileName) || mimeToExt(payload.mimeType);
     const stagedPath = join(OUTBOUND_DIR, `${id}${ext}`);
     const buffer = Buffer.from(payload.base64, 'base64');
-    writeFileSync(stagedPath, buffer);
+    await fsP.writeFile(stagedPath, buffer);
 
     const mimeType = payload.mimeType || getMimeType(ext);
     const fileSize = buffer.length;
@@ -1647,7 +1914,7 @@ function registerFileHandlers(): void {
     // Generate preview for images
     let preview: string | null = null;
     if (mimeType.startsWith('image/')) {
-      preview = generateImagePreview(stagedPath, mimeType);
+      preview = await generateImagePreview(stagedPath, mimeType);
     }
 
     return { id, fileName: payload.fileName, mimeType, fileSize, stagedPath, preview };
@@ -1674,11 +1941,17 @@ function registerFileHandlers(): void {
       });
       if (result.canceled || !result.filePath) return { success: false };
 
-      if (params.filePath && existsSync(params.filePath)) {
-        copyFileSync(params.filePath, result.filePath);
+      const fsP = await import('fs/promises');
+      if (params.filePath) {
+        try {
+          await fsP.access(params.filePath);
+          await fsP.copyFile(params.filePath, result.filePath);
+        } catch {
+          return { success: false, error: 'Source file not found' };
+        }
       } else if (params.base64) {
         const buffer = Buffer.from(params.base64, 'base64');
-        writeFileSync(result.filePath, buffer);
+        await fsP.writeFile(result.filePath, buffer);
       } else {
         return { success: false, error: 'No image data provided' };
       }
@@ -1689,19 +1962,16 @@ function registerFileHandlers(): void {
   });
 
   ipcMain.handle('media:getThumbnails', async (_, paths: Array<{ filePath: string; mimeType: string }>) => {
+    const fsP = await import('fs/promises');
     const results: Record<string, { preview: string | null; fileSize: number }> = {};
     for (const { filePath, mimeType } of paths) {
       try {
-        if (!existsSync(filePath)) {
-          results[filePath] = { preview: null, fileSize: 0 };
-          continue;
-        }
-        const stat = statSync(filePath);
+        const s = await fsP.stat(filePath);
         let preview: string | null = null;
         if (mimeType.startsWith('image/')) {
-          preview = generateImagePreview(filePath, mimeType);
+          preview = await generateImagePreview(filePath, mimeType);
         }
-        results[filePath] = { preview, fileSize: stat.size };
+        results[filePath] = { preview, fileSize: s.size };
       } catch {
         results[filePath] = { preview: null, fileSize: 0 };
       }

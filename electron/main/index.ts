@@ -9,27 +9,35 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { createTray } from './tray';
 import { createMenu } from './menu';
 
+import { appUpdater, registerUpdateHandlers } from './updater';
 import { logger } from '../utils/logger';
 import { warmupNetworkOptimization } from '../utils/uv-env';
-import { runCli } from './cli/index';
-import { resolveCliArgs } from './cli/args';
 
 import { ClawHubService } from '../gateway/clawhub';
-import { ensureOclawContext } from '../utils/openclaw-workspace';
+import { ensureOclawContext, repairOclawOnlyBootstrapFiles } from '../utils/openclaw-workspace';
+import { autoInstallCliIfNeeded, generateCompletionCache, installCompletionToProfile } from '../utils/openclaw-cli';
 import { isQuitting, setQuitting } from './app-state';
 
-// Disable GPU acceleration for better compatibility
+// Disable GPU hardware acceleration globally for maximum stability across
+// all GPU configurations (no GPU, integrated, discrete).
+//
+// Rationale (following VS Code's philosophy):
+// - Page/file loading is async data fetching — zero GPU dependency.
+// - The original per-platform GPU branching was added to avoid CPU rendering
+//   competing with sync I/O on Windows, but all file I/O is now async
+//   (fs/promises), so that concern no longer applies.
+// - Software rendering is deterministic across all hardware; GPU compositing
+//   behaviour varies between vendors (Intel, AMD, NVIDIA, Apple Silicon) and
+//   driver versions, making it the #1 source of rendering bugs in Electron.
+//
+// Users who want GPU acceleration can pass `--enable-gpu` on the CLI or
+// set `"disable-hardware-acceleration": false` in the app config (future).
 app.disableHardwareAcceleration();
 
 // Global references
 let mainWindow: BrowserWindow | null = null;
-let gatewayManager: GatewayManager | null = null;
-let clawHubService: ClawHubService | null = null;
-// Use full argv tail to avoid launch-mode specific offsets.
-// In both packaged and defaultApp mode, real CLI tokens appear after argv[0].
-const forwardedArgs = process.argv.slice(1);
-const cliArgs = resolveCliArgs(forwardedArgs);
-const isCliMode = cliArgs.length > 0;
+const gatewayManager = new GatewayManager();
+const clawHubService = new ClawHubService();
 
 /**
  * Resolve the icons directory path (works in both dev and packaged mode)
@@ -47,18 +55,9 @@ function getIconsDir(): string {
  * Get the app icon for the current platform
  */
 function getAppIcon(): Electron.NativeImage | undefined {
+  if (process.platform === 'darwin') return undefined; // macOS uses the app bundle icon
+
   const iconsDir = getIconsDir();
-
-  // macOS: use .icns in dev mode, app bundle icon in production
-  if (process.platform === 'darwin') {
-    if (!app.isPackaged) {
-      const iconPath = join(iconsDir, 'icon.icns');
-      const icon = nativeImage.createFromPath(iconPath);
-      return icon.isEmpty() ? undefined : icon;
-    }
-    return undefined; // Packaged app uses bundle icon
-  }
-
   const iconPath =
     process.platform === 'win32'
       ? join(iconsDir, 'icon.ico')
@@ -125,10 +124,6 @@ async function initialize(): Promise<void> {
     `Runtime: platform=${process.platform}/${process.arch}, electron=${process.versions.electron}, node=${process.versions.node}, packaged=${app.isPackaged}`
   );
 
-  // Initialize gateway manager and clawhub service
-  gatewayManager = new GatewayManager();
-  clawHubService = new ClawHubService();
-
   // Warm up network optimization (non-blocking)
   void warmupNetworkOptimization();
 
@@ -141,47 +136,34 @@ async function initialize(): Promise<void> {
   // Create system tray
   createTray(mainWindow);
 
-  // Inject OpenRouter site headers (HTTP-Referer & X-Title) for rankings on openrouter.ai
-  session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['https://openrouter.ai/*'] },
+  // Override security headers ONLY for the OpenClaw Gateway Control UI.
+  // The URL filter ensures this callback only fires for gateway requests,
+  // avoiding unnecessary overhead on every other HTTP response.
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: ['http://127.0.0.1:18789/*', 'http://localhost:18789/*'] },
     (details, callback) => {
-      details.requestHeaders['HTTP-Referer'] = 'https://github.com/wang48/oclaw';
-      details.requestHeaders['X-Title'] = 'Oclaw';
-      callback({ requestHeaders: details.requestHeaders });
+      const headers = { ...details.responseHeaders };
+      delete headers['X-Frame-Options'];
+      delete headers['x-frame-options'];
+      if (headers['Content-Security-Policy']) {
+        headers['Content-Security-Policy'] = headers['Content-Security-Policy'].map(
+          (csp) => csp.replace(/frame-ancestors\s+'none'/g, "frame-ancestors 'self' *")
+        );
+      }
+      if (headers['content-security-policy']) {
+        headers['content-security-policy'] = headers['content-security-policy'].map(
+          (csp) => csp.replace(/frame-ancestors\s+'none'/g, "frame-ancestors 'self' *")
+        );
+      }
+      callback({ responseHeaders: headers });
     },
   );
-
-  // Override security headers ONLY for the OpenClaw Gateway Control UI
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    const isGatewayUrl = details.url.includes('127.0.0.1:18789') || details.url.includes('localhost:18789');
-
-    if (!isGatewayUrl) {
-      callback({ responseHeaders: details.responseHeaders });
-      return;
-    }
-
-    const headers = { ...details.responseHeaders };
-    delete headers['X-Frame-Options'];
-    delete headers['x-frame-options'];
-    if (headers['Content-Security-Policy']) {
-      headers['Content-Security-Policy'] = headers['Content-Security-Policy'].map(
-        (csp) => csp.replace(/frame-ancestors\s+'none'/g, "frame-ancestors 'self' *")
-      );
-    }
-    if (headers['content-security-policy']) {
-      headers['content-security-policy'] = headers['content-security-policy'].map(
-        (csp) => csp.replace(/frame-ancestors\s+'none'/g, "frame-ancestors 'self' *")
-      );
-    }
-    callback({ responseHeaders: headers });
-  });
 
   // Register IPC handlers
   registerIpcHandlers(gatewayManager, clawHubService, mainWindow);
 
   // Register update handlers
-  const { getAppUpdater, registerUpdateHandlers } = await import('./updater');
-  registerUpdateHandlers(getAppUpdater(), mainWindow);
+  registerUpdateHandlers(appUpdater, mainWindow);
 
   // Note: Auto-check for updates is driven by the renderer (update store init)
   // so it respects the user's "Auto-check for updates" setting.
@@ -198,14 +180,14 @@ async function initialize(): Promise<void> {
     mainWindow = null;
   });
 
-  // Merge Oclaw context snippets into the openclaw workspace bootstrap files
-  try {
-    ensureOclawContext();
-  } catch (error) {
-    logger.warn('Failed to merge Oclaw context into workspace:', error);
-  }
+  // Repair any bootstrap files that only contain Oclaw markers (no OpenClaw
+  // template content). This fixes a race condition where ensureOclawContext()
+  // previously created the file before the gateway could seed the full template.
+  void repairOclawOnlyBootstrapFiles().catch((error) => {
+    logger.warn('Failed to repair bootstrap files:', error);
+  });
 
-  // Start Gateway automatically
+  // Start Gateway automatically (this seeds missing bootstrap files with full templates)
   try {
     logger.debug('Auto-starting Gateway...');
     await gatewayManager.start();
@@ -214,22 +196,37 @@ async function initialize(): Promise<void> {
     logger.error('Gateway auto-start failed:', error);
     mainWindow?.webContents.send('gateway:error', String(error));
   }
+
+  // Merge Oclaw context snippets into the workspace bootstrap files.
+  // The gateway seeds workspace files asynchronously after its HTTP server
+  // is ready, so ensureOclawContext will retry until the target files appear.
+  void ensureOclawContext().catch((error) => {
+    logger.warn('Failed to merge Oclaw context into workspace:', error);
+  });
+
+  // Auto-install openclaw CLI and shell completions (non-blocking).
+  void autoInstallCliIfNeeded((installedPath) => {
+    mainWindow?.webContents.send('openclaw:cli-installed', installedPath);
+  }).then(() => {
+    generateCompletionCache();
+    installCompletionToProfile();
+  }).catch((error) => {
+    logger.warn('CLI auto-install failed:', error);
+  });
+
+  // Re-apply Oclaw context after every gateway restart because the gateway
+  // may re-seed workspace files with clean templates (losing Oclaw markers).
+  gatewayManager.on('status', (status: { state: string }) => {
+    if (status.state === 'running') {
+      void ensureOclawContext().catch((error) => {
+        logger.warn('Failed to re-merge Oclaw context after gateway reconnect:', error);
+      });
+    }
+  });
 }
 
 // Application lifecycle
 app.whenReady().then(() => {
-  if (isCliMode) {
-    void runCli(cliArgs)
-      .then((code) => {
-        app.exit(code);
-      })
-      .catch((error) => {
-        console.error('CLI execution failed:', error);
-        app.exit(1);
-      });
-    return;
-  }
-
   initialize();
 
   // Register activate handler AFTER app is ready to prevent
@@ -254,14 +251,10 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   setQuitting();
   // Fire-and-forget: do not await gatewayManager.stop() here.
-  // Awaiting inside a before-quit handler can stall Electron's
-  // replyToApplicationShouldTerminate: call when the quit is initiated
-  // by Squirrel.Mac (quitAndInstall), preventing the app from ever exiting.
-  if (gatewayManager) {
-    void gatewayManager.stop().catch((err) => {
-      logger.warn('gatewayManager.stop() error during quit:', err);
-    });
-  }
+  // Awaiting inside before-quit can stall Electron's quit sequence.
+  void gatewayManager.stop().catch((err) => {
+    logger.warn('gatewayManager.stop() error during quit:', err);
+  });
 });
 
 // Export for testing

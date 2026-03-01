@@ -8,10 +8,10 @@
  */
 export const PORTS = {
   /** Oclaw GUI development server port */
-  OCLAW_DEV: 5173,
+  CLAWX_DEV: 5173,
   
   /** Oclaw GUI production port (for reference) */
-  OCLAW_GUI: 23333,
+  CLAWX_GUI: 23333,
   
   /** OpenClaw Gateway port */
   OPENCLAW_GATEWAY: 18789,
@@ -21,7 +21,7 @@ export const PORTS = {
  * Get port from environment or default
  */
 export function getPort(key: keyof typeof PORTS): number {
-  const envKey = `OCLAW_PORT_${key}`;
+  const envKey = `CLAWX_PORT_${key}`;
   const envValue = process.env[envKey];
   return envValue ? parseInt(envValue, 10) : PORTS[key];
 }
@@ -34,7 +34,7 @@ export const APP_PATHS = {
   OPENCLAW_CONFIG: '~/.openclaw',
   
   /** Oclaw configuration directory */
-  OCLAW_CONFIG: '~/.oclaw',
+  CLAWX_CONFIG: '~/.oclaw',
   
   /** Log files directory */
   LOGS: '~/.oclaw/logs',

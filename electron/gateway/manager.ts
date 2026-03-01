@@ -6,7 +6,7 @@ import { app } from 'electron';
 import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
-import { existsSync } from 'fs';
+import { existsSync, writeFileSync } from 'fs';
 import WebSocket from 'ws';
 import { PORTS } from '../utils/config';
 import { 
@@ -14,6 +14,7 @@ import {
   getOpenClawEntryPath, 
   isOpenClawBuilt, 
   isOpenClawPresent,
+  appendNodeRequireToNodeOptions,
   quoteForCmd,
 } from '../utils/paths';
 import { getSetting } from '../utils/store';
@@ -30,7 +31,7 @@ import {
   buildDeviceAuthPayload,
   type DeviceIdentity,
 } from '../utils/device-identity';
-import { syncGatewayTokenToConfig } from '../utils/openclaw-auth';
+import { syncGatewayTokenToConfig, syncBrowserConfigToOpenClaw } from '../utils/openclaw-auth';
 
 /**
  * Gateway connection status
@@ -108,6 +109,57 @@ function getNodeExecutablePath(): string {
 }
 
 /**
+ * Ensure the gateway fetch-preload script exists in userData and return
+ * its absolute path.  The script patches globalThis.fetch to inject
+ * Oclaw app-attribution headers (HTTP-Referer, X-Title) for OpenRouter
+ * API requests, overriding the OpenClaw runner's hardcoded defaults.
+ *
+ * Inlined here so it works in dev, packaged, and asar modes without
+ * extra build config.  Loaded by the Gateway child process via
+ * NODE_OPTIONS --require.
+ */
+const GATEWAY_FETCH_PRELOAD_SOURCE = `'use strict';
+(function () {
+  var _f = globalThis.fetch;
+  if (typeof _f !== 'function') return;
+  if (globalThis.__oclawFetchPatched) return;
+  globalThis.__oclawFetchPatched = true;
+
+  globalThis.fetch = function oclawFetch(input, init) {
+    var url =
+      typeof input === 'string' ? input
+        : input && typeof input === 'object' && typeof input.url === 'string'
+          ? input.url : '';
+
+    if (url.indexOf('openrouter.ai') !== -1) {
+      init = init ? Object.assign({}, init) : {};
+      var prev = init.headers;
+      var flat = {};
+      if (prev && typeof prev.forEach === 'function') {
+        prev.forEach(function (v, k) { flat[k] = v; });
+      } else if (prev && typeof prev === 'object') {
+        Object.assign(flat, prev);
+      }
+      delete flat['http-referer'];
+      delete flat['HTTP-Referer'];
+      delete flat['x-title'];
+      delete flat['X-Title'];
+      flat['HTTP-Referer'] = 'https://oclaw.app';
+      flat['X-Title'] = 'Oclaw';
+      init.headers = flat;
+    }
+    return _f.call(globalThis, input, init);
+  };
+})();
+`;
+
+function ensureGatewayFetchPreload(): string {
+  const dest = path.join(app.getPath('userData'), 'gateway-fetch-preload.cjs');
+  try { writeFileSync(dest, GATEWAY_FETCH_PRELOAD_SOURCE, 'utf-8'); } catch { /* best-effort */ }
+  return dest;
+}
+
+/**
  * Gateway Manager
  * Handles starting, stopping, and communicating with the OpenClaw Gateway
  */
@@ -130,17 +182,21 @@ export class GatewayManager extends EventEmitter {
     timeout: NodeJS.Timeout;
   }> = new Map();
   private deviceIdentity: DeviceIdentity | null = null;
+  private restartDebounceTimer: NodeJS.Timeout | null = null;
   
   constructor(config?: Partial<ReconnectConfig>) {
     super();
     this.reconnectConfig = { ...DEFAULT_RECONNECT_CONFIG, ...config };
-    this.initDeviceIdentity();
+    // Device identity is loaded lazily in start() — not in the constructor —
+    // so that async file I/O and key generation don't block module loading.
   }
 
-  private initDeviceIdentity(): void {
+  private async initDeviceIdentity(): Promise<void> {
+    if (this.deviceIdentity) return; // already loaded
     try {
       const identityPath = path.join(app.getPath('userData'), 'oclaw-device-identity.json');
-      this.deviceIdentity = loadOrCreateDeviceIdentity(identityPath);
+      this.deviceIdentity = await loadOrCreateDeviceIdentity(identityPath);
+      logger.debug(`Device identity loaded (deviceId=${this.deviceIdentity.deviceId})`);
     } catch (err) {
       logger.warn('Failed to load device identity, scopes will be limited:', err);
     }
@@ -209,6 +265,10 @@ export class GatewayManager extends EventEmitter {
     logger.info(`Gateway start requested (port=${this.status.port})`);
     this.lastSpawnSummary = null;
     this.shouldReconnect = true;
+
+    // Lazily load device identity (async file I/O + key generation).
+    // Must happen before connect() which uses the identity for the handshake.
+    await this.initDeviceIdentity();
 
     // Manual start should override and cancel any pending reconnect timer.
     if (this.reconnectTimer) {
@@ -368,6 +428,26 @@ export class GatewayManager extends EventEmitter {
     await this.stop();
     await this.start();
   }
+
+  /**
+   * Debounced restart — coalesces multiple rapid restart requests into a
+   * single restart after `delayMs` of inactivity.  This prevents the
+   * cascading stop/start cycles that occur when provider:save,
+   * provider:setDefault and channel:saveConfig all fire within seconds
+   * of each other during setup.
+   */
+  debouncedRestart(delayMs = 2000): void {
+    if (this.restartDebounceTimer) {
+      clearTimeout(this.restartDebounceTimer);
+    }
+    logger.debug(`Gateway restart debounced (will fire in ${delayMs}ms)`);
+    this.restartDebounceTimer = setTimeout(() => {
+      this.restartDebounceTimer = null;
+      void this.restart().catch((err) => {
+        logger.warn('Debounced Gateway restart failed:', err);
+      });
+    }, delayMs);
+  }
   
   /**
    * Clear all active timers
@@ -384,6 +464,10 @@ export class GatewayManager extends EventEmitter {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;
+    }
+    if (this.restartDebounceTimer) {
+      clearTimeout(this.restartDebounceTimer);
+      this.restartDebounceTimer = null;
     }
   }
   
@@ -539,9 +623,15 @@ export class GatewayManager extends EventEmitter {
       const port = PORTS.OPENCLAW_GATEWAY;
       
       try {
+        // Platform-specific command to find processes listening on the gateway port.
+        // On Windows, lsof doesn't exist; use PowerShell's Get-NetTCPConnection instead.
+        const cmd = process.platform === 'win32'
+          ? `powershell -NoProfile -Command "(Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue).OwningProcess"`
+          : `lsof -i :${port} -sTCP:LISTEN -t`;
+
         const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
           import('child_process').then(cp => {
-            cp.exec(`lsof -i :${port} -sTCP:LISTEN -t`, { timeout: 5000 }, (err, stdout) => {
+            cp.exec(cmd, { timeout: 5000 }, (err, stdout) => {
               if (err) resolve({ stdout: '' });
               else resolve({ stdout });
             });
@@ -549,7 +639,7 @@ export class GatewayManager extends EventEmitter {
         });
         
         if (stdout.trim()) {
-          const pids = stdout.trim().split('\n')
+          const pids = stdout.trim().split(/\r?\n/)
             .map(s => s.trim())
             .filter(Boolean);
             
@@ -559,18 +649,33 @@ export class GatewayManager extends EventEmitter {
 
                // Unload the launchctl service first so macOS doesn't auto-
                // respawn the process we're about to kill.
-               await this.unloadLaunchctlService();
+               if (process.platform === 'darwin') {
+                 await this.unloadLaunchctlService();
+               }
 
-               // SIGTERM first so the gateway can clean up its lock file.
+               // Terminate orphaned processes
                for (const pid of pids) {
-                 try { process.kill(parseInt(pid), 'SIGTERM'); } catch { /* ignore */ }
+                 try {
+                   if (process.platform === 'win32') {
+                     // On Windows, use taskkill for reliable process group termination
+                     import('child_process').then(cp => {
+                       cp.exec(`taskkill /PID ${pid} /T /F`, { timeout: 5000 }, () => {});
+                     }).catch(() => {});
+                   } else {
+                     // SIGTERM first so the gateway can clean up its lock file.
+                     process.kill(parseInt(pid), 'SIGTERM');
+                   }
+                 } catch { /* ignore */ }
                }
-               await new Promise(r => setTimeout(r, 3000));
-               // SIGKILL any survivors.
-               for (const pid of pids) {
-                 try { process.kill(parseInt(pid), 0); process.kill(parseInt(pid), 'SIGKILL'); } catch { /* already exited */ }
+               await new Promise(r => setTimeout(r, process.platform === 'win32' ? 2000 : 3000));
+
+               // SIGKILL any survivors (Unix only — Windows taskkill /F is already forceful)
+               if (process.platform !== 'win32') {
+                 for (const pid of pids) {
+                   try { process.kill(parseInt(pid), 0); process.kill(parseInt(pid), 'SIGKILL'); } catch { /* already exited */ }
+                 }
+                 await new Promise(r => setTimeout(r, 1000));
                }
-               await new Promise(r => setTimeout(r, 1000));
                return null;
             }
           }
@@ -632,9 +737,15 @@ export class GatewayManager extends EventEmitter {
     // system-managed launchctl service) the WebSocket handshake will fail
     // with "token mismatch" even though we pass --token on the CLI.
     try {
-      syncGatewayTokenToConfig(gatewayToken);
+      await syncGatewayTokenToConfig(gatewayToken);
     } catch (err) {
       logger.warn('Failed to sync gateway token to openclaw.json:', err);
+    }
+
+    try {
+      await syncBrowserConfigToOpenClaw();
+    } catch (err) {
+      logger.warn('Failed to sync browser config to openclaw.json:', err);
     }
     
     let command: string;
@@ -753,6 +864,20 @@ export class GatewayManager extends EventEmitter {
             !existingNodeOpts.includes('--no-warnings')) {
           spawnEnv['NODE_OPTIONS'] = `${existingNodeOpts} --disable-warning=ExperimentalWarning`.trim();
         }
+      }
+
+      // Inject fetch preload so OpenRouter requests carry Oclaw headers.
+      // The preload patches globalThis.fetch before any module loads.
+      try {
+        const preloadPath = ensureGatewayFetchPreload();
+        if (existsSync(preloadPath)) {
+          spawnEnv['NODE_OPTIONS'] = appendNodeRequireToNodeOptions(
+            spawnEnv['NODE_OPTIONS'],
+            preloadPath,
+          );
+        }
+      } catch (err) {
+        logger.warn('Failed to set up OpenRouter headers preload:', err);
       }
 
       const useShell = !app.isPackaged && process.platform === 'win32';
@@ -1145,7 +1270,6 @@ export class GatewayManager extends EventEmitter {
       return;
     }
     
-    // Emit generic message for other handlers
     this.emit('message', message);
   }
   
@@ -1153,19 +1277,34 @@ export class GatewayManager extends EventEmitter {
    * Handle OpenClaw protocol events
    */
   private handleProtocolEvent(event: string, payload: unknown): void {
-    // Map OpenClaw events to our internal event types
     switch (event) {
       case 'tick':
-        // Heartbeat tick, ignore
         break;
       case 'chat':
         this.emit('chat:message', { message: payload });
         break;
+      case 'agent': {
+        // Agent events may carry chat streaming data inside payload.data,
+        // or be lifecycle events (phase=started/completed) with no message.
+        const p = payload as Record<string, unknown>;
+        const data = (p.data && typeof p.data === 'object') ? p.data as Record<string, unknown> : {};
+        const chatEvent: Record<string, unknown> = {
+          ...data,
+          runId: p.runId ?? data.runId,
+          sessionKey: p.sessionKey ?? data.sessionKey,
+          state: p.state ?? data.state,
+          message: p.message ?? data.message,
+        };
+        if (chatEvent.state || chatEvent.message) {
+          this.emit('chat:message', { message: chatEvent });
+        }
+        this.emit('notification', { method: event, params: payload });
+        break;
+      }
       case 'channel.status':
         this.emit('channel:status', payload as { channelId: string; status: string });
         break;
       default:
-        // Forward unknown events as generic notifications
         this.emit('notification', { method: event, params: payload });
     }
   }

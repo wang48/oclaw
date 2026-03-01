@@ -10,15 +10,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ICONS_DIR = path.join(PROJECT_ROOT, 'resources', 'icons');
-const JPG_SOURCE = path.join(ICONS_DIR, 'oclaw-no-text.jpg');
 const SVG_SOURCE = path.join(ICONS_DIR, 'icon.svg');
-const SOURCE_IMAGE = fs.existsSync(JPG_SOURCE) ? JPG_SOURCE : SVG_SOURCE;
 
 echo`🎨 Generating Oclaw icons using Node.js...`;
 
-// Check if icon source exists
-if (!fs.existsSync(SOURCE_IMAGE)) {
-  echo`❌ Icon source not found: ${SOURCE_IMAGE}`;
+// Check if SVG source exists
+if (!fs.existsSync(SVG_SOURCE)) {
+  echo`❌ SVG source not found: ${SVG_SOURCE}`;
   process.exit(1);
 }
 
@@ -27,8 +25,8 @@ await fs.ensureDir(ICONS_DIR);
 
 try {
   // 1. Generate Master PNG Buffer (1024x1024)
-  echo`  Processing icon source: ${path.basename(SOURCE_IMAGE)}...`;
-  const masterPngBuffer = await sharp(SOURCE_IMAGE)
+  echo`  Processing SVG source...`;
+  const masterPngBuffer = await sharp(SVG_SOURCE)
     .resize(1024, 1024)
     .png() // Ensure it's PNG
     .toBuffer();

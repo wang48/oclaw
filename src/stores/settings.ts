@@ -3,7 +3,7 @@
  * Manages application settings
  */
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import i18n from '@/i18n';
 
 type Theme = 'light' | 'dark' | 'system';
@@ -89,20 +89,6 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'oclaw-settings',
-      storage: createJSONStorage(() => {
-        const fallback = {
-          getItem: () => null,
-          setItem: () => undefined,
-          removeItem: () => undefined,
-        };
-        if (typeof window === 'undefined' || !window.localStorage) {
-          return fallback;
-        }
-        if (typeof window.localStorage.setItem !== 'function') {
-          return fallback;
-        }
-        return window.localStorage;
-      }),
     }
   )
 );

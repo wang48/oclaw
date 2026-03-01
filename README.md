@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="resources/icons/icon.png" width="128" height="128" alt="Oclaw Logo" />
+  <img src="src/assets/logo.svg" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
 <h1 align="center">Oclaw</h1>
@@ -25,7 +25,7 @@
   <a href="https://discord.com/invite/84Kex3GGAh" target="_blank">
   <img src="https://img.shields.io/discord/1399603591471435907?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord" />
   </a>
-  <img src="https://img.shields.io/github/downloads/wang48/oclaw/total?color=%23027DEB" alt="Downloads" />
+  <img src="https://img.shields.io/github/downloads/ValueCell-ai/Oclaw/total?color=%23027DEB" alt="Downloads" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
@@ -58,9 +58,9 @@ Oclaw comes pre-configured with best-practice model providers and natively suppo
   <img src="resources/screenshot/skills.png" style="width: 100%; height: auto;">
 </p>
 
-<p align="center">
+<!-- <p align="center">
   <img src="resources/screenshot/channels.png" style="width: 100%; height: auto;">
-</p>
+</p> -->
 
 <p align="center">
   <img src="resources/screenshot/dashboard.png" style="width: 100%; height: auto;">
@@ -129,13 +129,13 @@ Light mode, dark mode, or system-synchronized themes. Oclaw adapts to your prefe
 
 #### Pre-built Releases (Recommended)
 
-Download the latest release for your platform from the [Releases](https://github.com/wang48/oclaw/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/ValueCell-ai/Oclaw/releases) page.
 
 #### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/wang48/oclaw.git
+git clone https://github.com/ValueCell-ai/Oclaw.git
 cd Oclaw
 
 # Initialize the project
@@ -283,36 +283,6 @@ pnpm package:win          # Package for Windows
 pnpm package:linux        # Package for Linux
 ```
 
-### CLI Mode
-
-Oclaw now supports a command-line mode from the same executable:
-
-```bash
-# General
-Oclaw help
-Oclaw status
-
-# Gateway / RPC
-Oclaw gateway start
-Oclaw gateway rpc sessions.list '{"limit":50}'
-
-# Provider / Channel / Cron
-Oclaw provider list
-Oclaw channel list
-Oclaw cron list
-```
-
-Available command groups:
-- `openclaw`
-- `gateway`
-- `provider`
-- `channel`
-- `skill`
-- `cron`
-- `chat`
-- `clawhub`
-- `uv`
-
 ### Tech Stack
 
 | Layer | Technology |
@@ -368,6 +338,14 @@ Join our community to connect with other users, get support, and share your expe
 | Enterprise WeChat | Feishu Group | Discord |
 | :---: | :---: | :---: |
 | <img src="src/assets/community/wecom-qr.png" width="150" alt="WeChat QR Code" /> | <img src="src/assets/community/feishu-qr.png" width="150" alt="Feishu QR Code" /> | <img src="src/assets/community/20260212-185822.png" width="150" alt="Discord QR Code" /> |
+
+---
+
+## Star History
+
+<p align="center">
+  <img src="https://api.star-history.com/svg?repos=ValueCell-ai/Oclaw&type=Date" alt="Star History Chart" />
+</p>
 
 ---
 

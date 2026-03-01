@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="resources/icons/icon.png" width="128" height="128" alt="Oclaw Logo" />
+  <img src="src/assets/logo.svg" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
 <h1 align="center">Oclaw</h1>
@@ -25,7 +25,7 @@
   <a href="https://discord.com/invite/84Kex3GGAh" target="_blank">
   <img src="https://img.shields.io/discord/1399603591471435907?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord" />
   </a>
-  <img src="https://img.shields.io/github/downloads/wang48/oclaw/total?color=%23027DEB" alt="Downloads" />
+  <img src="https://img.shields.io/github/downloads/ValueCell-ai/Oclaw/total?color=%23027DEB" alt="Downloads" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
@@ -130,13 +130,13 @@ Oclaw 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们
 
 #### 预构建版本（推荐）
 
-从 [Releases](https://github.com/wang48/oclaw/releases) 页面下载适用于你平台的最新版本。
+从 [Releases](https://github.com/ValueCell-ai/Oclaw/releases) 页面下载适用于你平台的最新版本。
 
 #### 从源码构建
 
 ```bash
 # 克隆仓库
-git clone https://github.com/wang48/oclaw.git
+git clone https://github.com/ValueCell-ai/Oclaw.git
 cd Oclaw
 
 # 初始化项目
@@ -284,36 +284,6 @@ pnpm package:win          # 为 Windows 打包
 pnpm package:linux        # 为 Linux 打包
 ```
 
-### CLI 模式
-
-Oclaw 现在支持通过同一个可执行文件进入命令行模式：
-
-```bash
-# 通用
-Oclaw help
-Oclaw status
-
-# 网关 / RPC
-Oclaw gateway start
-Oclaw gateway rpc sessions.list '{"limit":50}'
-
-# Provider / Channel / Cron
-Oclaw provider list
-Oclaw channel list
-Oclaw cron list
-```
-
-目前支持的命令组：
-- `openclaw`
-- `gateway`
-- `provider`
-- `channel`
-- `skill`
-- `cron`
-- `chat`
-- `clawhub`
-- `uv`
-
 ### 技术栈
 
 | 层级 | 技术 |
@@ -369,6 +339,14 @@ Oclaw 构建于以下优秀的开源项目之上：
 | 企业微信 | 飞书群组 | Discord |
 | :---: | :---: | :---: |
 | <img src="src/assets/community/wecom-qr.png" width="150" alt="企业微信二维码" /> | <img src="src/assets/community/feishu-qr.png" width="150" alt="飞书二维码" /> | <img src="src/assets/community/20260212-185822.png" width="150" alt="Discord 二维码" /> |
+
+---
+
+## Stars 历史
+
+<p align="center">
+  <img src="https://api.star-history.com/svg?repos=ValueCell-ai/Oclaw&type=Date" alt="Stars 历史图表" />
+</p>
 
 ---
 

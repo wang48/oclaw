@@ -1,11 +1,32 @@
-import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync } from 'fs';
+/**
+ * OpenClaw workspace context utilities.
+ *
+ * All file I/O is async (fs/promises) to avoid blocking the Electron
+ * main thread.
+ */
+import { access, readFile, writeFile, readdir, mkdir, unlink } from 'fs/promises';
+import { constants, Dirent } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { logger } from './logger';
 import { getResourcesDir } from './paths';
 
-const OCLAW_BEGIN = '<!-- oclaw:begin -->';
-const OCLAW_END = '<!-- oclaw:end -->';
+const CLAWX_BEGIN = '<!-- oclaw:begin -->';
+const CLAWX_END = '<!-- oclaw:end -->';
+
+// ── Helpers ──────────────────────────────────────────────────────
+
+async function fileExists(p: string): Promise<boolean> {
+  try { await access(p, constants.F_OK); return true; } catch { return false; }
+}
+
+async function ensureDir(dir: string): Promise<void> {
+  if (!(await fileExists(dir))) {
+    await mkdir(dir, { recursive: true });
+  }
+}
+
+// ── Pure helpers (no I/O) ────────────────────────────────────────
 
 /**
  * Merge a Oclaw context section into an existing file's content.
@@ -13,28 +34,30 @@ const OCLAW_END = '<!-- oclaw:end -->';
  * Otherwise appends it at the end.
  */
 export function mergeOclawSection(existing: string, section: string): string {
-  const wrapped = `${OCLAW_BEGIN}\n${section.trim()}\n${OCLAW_END}`;
-  const beginIdx = existing.indexOf(OCLAW_BEGIN);
-  const endIdx = existing.indexOf(OCLAW_END);
+  const wrapped = `${CLAWX_BEGIN}\n${section.trim()}\n${CLAWX_END}`;
+  const beginIdx = existing.indexOf(CLAWX_BEGIN);
+  const endIdx = existing.indexOf(CLAWX_END);
   if (beginIdx !== -1 && endIdx !== -1) {
-    return existing.slice(0, beginIdx) + wrapped + existing.slice(endIdx + OCLAW_END.length);
+    return existing.slice(0, beginIdx) + wrapped + existing.slice(endIdx + CLAWX_END.length);
   }
   return existing.trimEnd() + '\n\n' + wrapped + '\n';
 }
+
+// ── Workspace directory resolution ───────────────────────────────
 
 /**
  * Collect all unique workspace directories from the openclaw config:
  * the defaults workspace, each agent's workspace, and any workspace-*
  * directories that already exist under ~/.openclaw/.
  */
-function resolveAllWorkspaceDirs(): string[] {
+async function resolveAllWorkspaceDirs(): Promise<string[]> {
   const openclawDir = join(homedir(), '.openclaw');
   const dirs = new Set<string>();
 
   const configPath = join(openclawDir, 'openclaw.json');
   try {
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    if (await fileExists(configPath)) {
+      const config = JSON.parse(await readFile(configPath, 'utf-8'));
 
       const defaultWs = config?.agents?.defaults?.workspace;
       if (typeof defaultWs === 'string' && defaultWs.trim()) {
@@ -56,7 +79,8 @@ function resolveAllWorkspaceDirs(): string[] {
   }
 
   try {
-    for (const entry of readdirSync(openclawDir, { withFileTypes: true })) {
+    const entries: Dirent[] = await readdir(openclawDir, { withFileTypes: true });
+    for (const entry of entries) {
       if (entry.isDirectory() && entry.name.startsWith('workspace')) {
         dirs.add(join(openclawDir, entry.name));
       }
@@ -72,51 +96,121 @@ function resolveAllWorkspaceDirs(): string[] {
   return [...dirs];
 }
 
+// ── Bootstrap file repair ────────────────────────────────────────
+
 /**
- * Ensure Oclaw context snippets are merged into the openclaw workspace
- * bootstrap files. Reads `*.oclaw.md` templates from resources/context/
- * and injects them as marker-delimited sections into the corresponding
- * workspace `.md` files (e.g. AGENTS.oclaw.md -> AGENTS.md).
- *
- * Iterates over every discovered agent workspace so all agents receive
- * the Oclaw context regardless of which one is active.
+ * Detect and remove bootstrap .md files that contain only Oclaw markers
+ * with no meaningful OpenClaw content outside them.
  */
-export function ensureOclawContext(): void {
+export async function repairOclawOnlyBootstrapFiles(): Promise<void> {
+  const workspaceDirs = await resolveAllWorkspaceDirs();
+  for (const workspaceDir of workspaceDirs) {
+    if (!(await fileExists(workspaceDir))) continue;
+
+    let entries: string[];
+    try {
+      entries = (await readdir(workspaceDir)).filter((f) => f.endsWith('.md'));
+    } catch {
+      continue;
+    }
+
+    for (const file of entries) {
+      const filePath = join(workspaceDir, file);
+      let content: string;
+      try {
+        content = await readFile(filePath, 'utf-8');
+      } catch {
+        continue;
+      }
+      const beginIdx = content.indexOf(CLAWX_BEGIN);
+      const endIdx = content.indexOf(CLAWX_END);
+      if (beginIdx === -1 || endIdx === -1) continue;
+
+      const before = content.slice(0, beginIdx).trim();
+      const after = content.slice(endIdx + CLAWX_END.length).trim();
+      if (before === '' && after === '') {
+        try {
+          await unlink(filePath);
+          logger.info(`Removed Oclaw-only bootstrap file for re-seeding: ${file} (${workspaceDir})`);
+        } catch {
+          logger.warn(`Failed to remove Oclaw-only bootstrap file: ${filePath}`);
+        }
+      }
+    }
+  }
+}
+
+// ── Context merging ──────────────────────────────────────────────
+
+/**
+ * Merge Oclaw context snippets into workspace bootstrap files that
+ * already exist on disk.  Returns the number of target files that were
+ * skipped because they don't exist yet.
+ */
+async function mergeOclawContextOnce(): Promise<number> {
   const contextDir = join(getResourcesDir(), 'context');
-  if (!existsSync(contextDir)) {
+  if (!(await fileExists(contextDir))) {
     logger.debug('Oclaw context directory not found, skipping context merge');
-    return;
+    return 0;
   }
 
   let files: string[];
   try {
-    files = readdirSync(contextDir).filter((f) => f.endsWith('.oclaw.md'));
+    files = (await readdir(contextDir)).filter((f) => f.endsWith('.clawx.md'));
   } catch {
-    return;
+    return 0;
   }
 
-  const workspaceDirs = resolveAllWorkspaceDirs();
+  const workspaceDirs = await resolveAllWorkspaceDirs();
+  let skipped = 0;
 
   for (const workspaceDir of workspaceDirs) {
-    if (!existsSync(workspaceDir)) {
-      mkdirSync(workspaceDir, { recursive: true });
-    }
+    await ensureDir(workspaceDir);
 
     for (const file of files) {
-      const targetName = file.replace('.oclaw.md', '.md');
+      const targetName = file.replace('.clawx.md', '.md');
       const targetPath = join(workspaceDir, targetName);
-      const section = readFileSync(join(contextDir, file), 'utf-8');
 
-      let existing = '';
-      if (existsSync(targetPath)) {
-        existing = readFileSync(targetPath, 'utf-8');
+      if (!(await fileExists(targetPath))) {
+        logger.debug(`Skipping ${targetName} in ${workspaceDir} (file does not exist yet, will be seeded by gateway)`);
+        skipped++;
+        continue;
       }
+
+      const section = await readFile(join(contextDir, file), 'utf-8');
+      const existing = await readFile(targetPath, 'utf-8');
 
       const merged = mergeOclawSection(existing, section);
       if (merged !== existing) {
-        writeFileSync(targetPath, merged, 'utf-8');
+        await writeFile(targetPath, merged, 'utf-8');
         logger.info(`Merged Oclaw context into ${targetName} (${workspaceDir})`);
       }
     }
   }
+
+  return skipped;
+}
+
+const RETRY_INTERVAL_MS = 2000;
+const MAX_RETRIES = 15;
+
+/**
+ * Ensure Oclaw context snippets are merged into the openclaw workspace
+ * bootstrap files.
+ */
+export async function ensureOclawContext(): Promise<void> {
+  let skipped = await mergeOclawContextOnce();
+  if (skipped === 0) return;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    await new Promise((r) => setTimeout(r, RETRY_INTERVAL_MS));
+    skipped = await mergeOclawContextOnce();
+    if (skipped === 0) {
+      logger.info(`Oclaw context merge completed after ${attempt} retry(ies)`);
+      return;
+    }
+    logger.debug(`Oclaw context merge: ${skipped} file(s) still missing (retry ${attempt}/${MAX_RETRIES})`);
+  }
+
+  logger.warn(`Oclaw context merge: ${skipped} file(s) still missing after ${MAX_RETRIES} retries`);
 }

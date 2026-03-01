@@ -26,6 +26,9 @@ extraResources:
   # because electron-builder respects .gitignore which excludes node_modules/)
   - from: build/openclaw/
     to: openclaw/
+  # NOTE: OpenClaw plugin mirrors (dingtalk, etc.) are bundled by the
+  # afterPack hook (after-pack.cjs) directly from node_modules, so they
+  # don't need an extraResources entry here.
 
 afterPack: ./scripts/after-pack.cjs
 
@@ -50,13 +53,14 @@ publish:
   - provider: github
     owner: ValueCell-ai
     repo: Oclaw
-    releaseType: release
 
 # macOS Configuration
 mac:
   extraResources:
     - from: resources/bin/darwin-${arch}
       to: bin
+    - from: resources/cli/posix/
+      to: cli/
   category: public.app-category.productivity
   icon: resources/icons/icon.icns
   target:
@@ -102,6 +106,8 @@ win:
   extraResources:
     - from: resources/bin/win32-${arch}
       to: bin
+    - from: resources/cli/win32/
+      to: cli/
   icon: resources/icons/icon.ico
   target:
     - target: nsis
@@ -112,6 +118,9 @@ win:
 nsis:
   oneClick: false
   perMachine: false
+  # Avoid NSIS build failure: warning 6010 (_ci_StrContains "not referenced") is emitted when
+  # building the uninstaller, because that function is only used in the install macro.
+  warningsAsErrors: false
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
   differentialPackage: true
@@ -129,6 +138,8 @@ linux:
   extraResources:
     - from: resources/bin/linux-${arch}
       to: bin
+    - from: resources/cli/posix/
+      to: cli/
   icon: resources/icons
   target:
     - target: AppImage
@@ -143,7 +154,7 @@ linux:
       arch:
         - x64
   category: Utility
-  maintainer: Oclaw Team <team@oclaw.app>
+  maintainer: Oclaw Team <public@valuecell.ai>
   vendor: Oclaw
   synopsis: AI Assistant powered by OpenClaw
   description: |
