@@ -8,7 +8,7 @@ import {
   getOpenClawSkillsDir,
   ensureDir,
 } from '../../../utils/paths';
-import { getOpenClawCliCommand, installOpenClawCliMac } from '../../../utils/openclaw-cli';
+import { getOpenClawCliCommand, installOpenClawCli } from '../../../utils/openclaw-cli';
 import { printCommandHelp } from '../help';
 import type { CommandContext, CommandResult } from '../types';
 
@@ -37,7 +37,7 @@ export async function handleOpenClaw(ctx: CommandContext): Promise<CommandResult
     case 'cli-command':
       return { data: { command: getOpenClawCliCommand() } };
     case 'install-cli-mac':
-      return { data: await installOpenClawCliMac() };
+      return { data: await installOpenClawCli() };
     default:
       throw new Error('Usage: openclaw <status|paths|cli-command|install-cli-mac>');
   }

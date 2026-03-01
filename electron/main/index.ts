@@ -17,6 +17,21 @@ import { ClawHubService } from '../gateway/clawhub';
 import { ensureOclawContext, repairOclawOnlyBootstrapFiles } from '../utils/openclaw-workspace';
 import { autoInstallCliIfNeeded, generateCompletionCache, installCompletionToProfile } from '../utils/openclaw-cli';
 import { isQuitting, setQuitting } from './app-state';
+import { isCliInvocationArgs } from './cli/args';
+import { runCli } from './cli/index';
+
+// Check for CLI mode before initializing GUI
+const cliArgs = process.argv.slice(1);
+if (isCliInvocationArgs(cliArgs)) {
+  // CLI mode: run command and exit
+  app.whenReady().then(async () => {
+    const exitCode = await runCli(cliArgs);
+    app.exit(exitCode);
+  });
+  // Skip the rest of the file in CLI mode
+} else {
+  // GUI mode: continue with normal initialization below
+}
 
 // Disable GPU hardware acceleration globally for maximum stability across
 // all GPU configurations (no GPU, integrated, discrete).

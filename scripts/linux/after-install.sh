@@ -19,11 +19,16 @@ if [ -x /opt/Oclaw/oclaw ]; then
     ln -sf /opt/Oclaw/oclaw /usr/local/bin/oclaw 2>/dev/null || true
 fi
 
-# Create symbolic link for openclaw CLI
+# Create symbolic links for openclaw CLI (both openclaw and oclaw commands)
 OPENCLAW_WRAPPER="/opt/Oclaw/resources/cli/openclaw"
+OCLAW_WRAPPER="/opt/Oclaw/resources/cli/oclaw"
 if [ -f "$OPENCLAW_WRAPPER" ]; then
     chmod +x "$OPENCLAW_WRAPPER" 2>/dev/null || true
     ln -sf "$OPENCLAW_WRAPPER" /usr/local/bin/openclaw 2>/dev/null || true
+fi
+if [ -f "$OCLAW_WRAPPER" ]; then
+    chmod +x "$OCLAW_WRAPPER" 2>/dev/null || true
+    ln -sf "$OCLAW_WRAPPER" /usr/local/bin/oclaw 2>/dev/null || true
 fi
 
 echo "Oclaw has been installed successfully."

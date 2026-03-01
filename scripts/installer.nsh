@@ -10,7 +10,7 @@
   ; elevation this call silently fails — no crash, just no key written.
   WriteRegDWORD HKLM "SYSTEM\CurrentControlSet\Control\FileSystem" "LongPathsEnabled" 1
 
-  ; Add resources\cli to the current user's PATH for openclaw CLI.
+  ; Add resources\cli to the current user's PATH for openclaw and oclaw CLI.
   ; Read current PATH, skip if already present, append otherwise.
   ReadRegStr $0 HKCU "Environment" "Path"
   StrCmp $0 "" _ci_setNew

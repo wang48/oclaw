@@ -1,0 +1,8 @@
+#!/bin/sh
+# Oclaw CLI wrapper for Git Bash / MSYS2 on Windows
+# Desktop AI agent runtime and control plane
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+INSTALL_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Pass all arguments to Oclaw in CLI mode
+exec "$INSTALL_DIR/Oclaw.exe" --cli "$@"
