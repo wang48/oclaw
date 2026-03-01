@@ -6,26 +6,20 @@
 <h1 align="center">Oclaw</h1>
 
 <p align="center">
-  <strong>The Desktop Interface for OpenClaw AI Agents</strong>
+  <strong>Enhanced Desktop Interface for OpenClaw AI Agents</strong>
 </p>
 
 <p align="center">
   <a href="#features">Features</a> •
-  <a href="#why-oclaw">Why Oclaw</a> •
   <a href="#getting-started">Getting Started</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#development">Development</a> •
-  <a href="#contributing">Contributing</a>
+  <a href="#whats-different">What's Different</a> •
+  <a href="#development">Development</a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-MacOS%20%7C%20Windows%20%7C%20Linux-blue" alt="Platform" />
   <img src="https://img.shields.io/badge/electron-40+-47848F?logo=electron" alt="Electron" />
   <img src="https://img.shields.io/badge/react-19-61DAFB?logo=react" alt="React" />
-  <a href="https://discord.com/invite/84Kex3GGAh" target="_blank">
-  <img src="https://img.shields.io/discord/1399603591471435907?logo=discord&labelColor=%20%235462eb&logoColor=%20%23f5f5f5&color=%20%235462eb" alt="chat on Discord" />
-  </a>
-  <img src="https://img.shields.io/github/downloads/ValueCell-ai/Oclaw/total?color=%23027DEB" alt="Downloads" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
 
@@ -37,83 +31,70 @@
 
 ## Overview
 
-**Oclaw** bridges the gap between powerful AI agents and everyday users. Built on top of [OpenClaw](https://github.com/OpenClaw), it transforms command-line AI orchestration into an accessible, beautiful desktop experience—no terminal required.
+**Oclaw** is a desktop application for OpenClaw AI agents, based on [ClawX](https://github.com/ValueCell-ai/ClawX) with enhanced features and optimizations.
 
-Whether you're automating workflows, managing AI-powered channels, or scheduling intelligent tasks, Oclaw provides the interface you need to harness AI agents effectively.
-
-Oclaw comes pre-configured with best-practice model providers and natively supports Windows as well as multi-language settings. Of course, you can also fine-tune advanced configurations via **Settings → Advanced → Developer Mode**.
-
----
-## Screenshot
-
-<p align="center">
-  <img src="resources/screenshot/chat.png" style="width: 100%; height: auto;">
-</p>
-
-<p align="center">
-  <img src="resources/screenshot/cron_task.png" style="width: 100%; height: auto;">
-</p>
-
-<p align="center">
-  <img src="resources/screenshot/skills.png" style="width: 100%; height: auto;">
-</p>
-
-<!-- <p align="center">
-  <img src="resources/screenshot/channels.png" style="width: 100%; height: auto;">
-</p> -->
-
-<p align="center">
-  <img src="resources/screenshot/dashboard.png" style="width: 100%; height: auto;">
-</p>
-
-<p align="center">
-  <img src="resources/screenshot/settings.png" style="width: 100%; height: auto;">
-</p>
+> **Note**: This project is built upon ClawX, the official desktop interface for OpenClaw. We maintain compatibility with upstream while adding unique features tailored for specific use cases.
 
 ---
 
-## Why Oclaw
+## What's Different from ClawX
 
-Building AI agents shouldn't require mastering the command line. Oclaw was designed with a simple philosophy: **powerful technology deserves an interface that respects your time.**
+Oclaw extends ClawX with the following enhancements:
 
-| Challenge | Oclaw Solution |
-|-----------|----------------|
-| Complex CLI setup | One-click installation with guided setup wizard |
-| Configuration files | Visual settings with real-time validation |
-| Process management | Automatic gateway lifecycle management |
-| Multiple AI providers | Unified provider configuration panel |
-| Skill/plugin installation | Built-in skill marketplace and management |
+### 🎨 **Refined Visual Design**
+- Rounded corner icons for a modern, polished look
+- Optimized macOS app icon sizing for better system integration
+- Enhanced UI consistency across all platforms
 
-### OpenClaw Inside
+### 🛠️ **Dual CLI System**
+Two independent command-line interfaces for different purposes:
 
-Oclaw is built directly upon the official **OpenClaw** core. Instead of requiring a separate installation, we embed the runtime within the application to provide a seamless "battery-included" experience.
+**`oclaw`** - Application Control CLI
+```bash
+oclaw status              # Check app status
+oclaw provider list       # Manage AI providers
+oclaw gateway start       # Control gateway
+oclaw skill status        # View skill status
+```
 
-We are committed to maintaining strict alignment with the upstream OpenClaw project, ensuring that you always have access to the latest capabilities, stability improvements, and ecosystem compatibility provided by the official releases.
+**`openclaw`** - OpenClaw Platform CLI
+```bash
+openclaw gateway start    # Start gateway service
+openclaw channels login   # Configure channels
+openclaw agent --message  # Interact with agents
+```
+
+### 🔧 **Enhanced Developer Experience**
+- Improved build scripts and automation
+- Better error handling and logging
+- Streamlined development workflow
+
+### 🌐 **Localization Improvements**
+- Enhanced Chinese language support
+- Better multi-language configuration handling
 
 ---
 
 ## Features
 
-### 🎯 Zero Configuration Barrier
-Complete the entire setup—from installation to your first AI interaction—through an intuitive graphical interface. No terminal commands, no YAML files, no environment variable hunting.
+All features from ClawX, plus:
 
-### 💬 Intelligent Chat Interface
-Communicate with AI agents through a modern chat experience. Support for multiple conversation contexts, message history, and rich content rendering with Markdown.
+### ✨ Unique to Oclaw
 
-### 📡 Multi-Channel Management
-Configure and monitor multiple AI channels simultaneously. Each channel operates independently, allowing you to run specialized agents for different tasks.
+- **Dual CLI Interface**: Separate commands for app control and OpenClaw platform operations
+- **Refined Icons**: Modern rounded-corner design across all platforms
+- **Enhanced Branding**: Consistent Oclaw branding throughout the application
+- **Optimized Build**: Improved packaging and distribution process
 
-### ⏰ Cron-Based Automation
-Schedule AI tasks to run automatically. Define triggers, set intervals, and let your AI agents work around the clock without manual intervention.
+### 🎯 Inherited from ClawX
 
-### 🧩 Extensible Skill System
-Extend your AI agents with pre-built skills. Browse, install, and manage skills through the integrated skill panel—no package managers required.
-
-### 🔐 Secure Provider Integration
-Connect to multiple AI providers (OpenAI, Anthropic, and more) with credentials stored securely in your system's native keychain.
-
-### 🌙 Adaptive Theming
-Light mode, dark mode, or system-synchronized themes. Oclaw adapts to your preferences automatically.
+- Zero-configuration setup wizard
+- Intelligent chat interface with AI agents
+- Multi-channel management (Telegram, Discord, WhatsApp, etc.)
+- Cron-based task automation
+- Extensible skill system with marketplace
+- Secure provider integration with system keychain
+- Adaptive theming (light/dark mode)
 
 ---
 
@@ -129,16 +110,16 @@ Light mode, dark mode, or system-synchronized themes. Oclaw adapts to your prefe
 
 #### Pre-built Releases (Recommended)
 
-Download the latest release for your platform from the [Releases](https://github.com/ValueCell-ai/Oclaw/releases) page.
+Download the latest release for your platform from the [Releases](https://github.com/wang48/oclaw/releases) page.
 
 #### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/ValueCell-ai/Oclaw.git
-cd Oclaw
+git clone https://github.com/wang48/oclaw.git
+cd oclaw
 
-# Initialize the project
+# Initialize the project (installs dependencies and downloads uv binary)
 pnpm run init
 
 # Start in development mode
@@ -147,76 +128,66 @@ pnpm dev
 
 ### First Launch
 
-When you launch Oclaw for the first time, the **Setup Wizard** will guide you through:
+The **Setup Wizard** will guide you through:
 
 1. **Language & Region** – Configure your preferred locale
-2. **AI Provider** – Enter your API keys for supported providers
-3. **Skill Bundles** – Select pre-configured skills for common use cases
-4. **Verification** – Test your configuration before entering the main interface
+2. **AI Provider** – Enter your API keys (OpenAI, Anthropic, etc.)
+3. **Skill Bundles** – Select pre-configured skills
+4. **Verification** – Test your configuration
 
 ---
 
-## Architecture
+## CLI Usage
 
-Oclaw employs a **dual-process architecture** that separates UI concerns from AI runtime operations:
+After installation, you have access to two CLI commands:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Oclaw Desktop App                         │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │              Electron Main Process                          │  │
-│  │  • Window & application lifecycle management               │  │
-│  │  • Gateway process supervision                              │  │
-│  │  • System integration (tray, notifications, keychain)       │  │
-│  │  • Auto-update orchestration                                │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                              │                                    │
-│                              │ IPC                                │
-│                              ▼                                    │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │              React Renderer Process                         │  │
-│  │  • Modern component-based UI (React 19)                     │  │
-│  │  • State management with Zustand                            │  │
-│  │  • Real-time WebSocket communication                        │  │
-│  │  • Rich Markdown rendering                                  │  │
-│  └────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-                               │ WebSocket (JSON-RPC)
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     OpenClaw Gateway                             │
-│                                                                  │
-│  • AI agent runtime and orchestration                           │
-│  • Message channel management                                    │
-│  • Skill/plugin execution environment                           │
-│  • Provider abstraction layer                                    │
-└─────────────────────────────────────────────────────────────────┘
+### Application Control (`oclaw`)
+
+Control the Oclaw desktop application:
+
+```bash
+# View help
+oclaw --help
+
+# Check application status
+oclaw status
+
+# Manage AI providers
+oclaw provider list
+oclaw provider save '{"id":"my-openai","name":"OpenAI","type":"openai"}' --api-key sk-xxx
+
+# Control gateway
+oclaw gateway status
+oclaw gateway start
+oclaw gateway stop
+
+# Manage skills
+oclaw skill status
+oclaw skill enable web-search
+
+# Manage cron jobs
+oclaw cron list
+oclaw cron trigger <job-id>
 ```
 
-### Design Principles
+### OpenClaw Platform (`openclaw`)
 
-- **Process Isolation**: The AI runtime operates in a separate process, ensuring UI responsiveness even during heavy computation
-- **Graceful Recovery**: Built-in reconnection logic with exponential backoff handles transient failures automatically
-- **Secure Storage**: API keys and sensitive data leverage the operating system's native secure storage mechanisms
-- **Hot Reload**: Development mode supports instant UI updates without restarting the gateway
+Access the full OpenClaw CLI:
 
----
+```bash
+# Gateway operations
+openclaw gateway --port 18789
 
-## Use Cases
+# Channel management
+openclaw channels login
+openclaw message send --target +1234567890 --message "Hello"
 
-### 🤖 Personal AI Assistant
-Configure a general-purpose AI agent that can answer questions, draft emails, summarize documents, and help with everyday tasks—all from a clean desktop interface.
+# Agent interaction
+openclaw agent --to +1234567890 --message "Summarize this" --deliver
 
-### 📊 Automated Monitoring
-Set up scheduled agents to monitor news feeds, track prices, or watch for specific events. Results are delivered to your preferred notification channel.
-
-### 💻 Developer Productivity
-Integrate AI into your development workflow. Use agents to review code, generate documentation, or automate repetitive coding tasks.
-
-### 🔄 Workflow Automation
-Chain multiple skills together to create sophisticated automation pipelines. Process data, transform content, and trigger actions—all orchestrated visually.
+# See full documentation
+openclaw --help
+```
 
 ---
 
@@ -225,62 +196,25 @@ Chain multiple skills together to create sophisticated automation pipelines. Pro
 ### Prerequisites
 
 - **Node.js**: 22+ (LTS recommended)
-- **Package Manager**: pnpm 9+ (recommended) or npm
-
-### Project Structure
-
-```
-Oclaw/
-├── electron/              # Electron Main Process
-│   ├── main/             # Application entry, window management
-│   ├── gateway/          # OpenClaw Gateway process manager
-│   ├── preload/          # Secure IPC bridge scripts
-│   └── utils/            # Utilities (storage, auth, paths)
-├── src/                   # React Renderer Process
-│   ├── components/       # Reusable UI components
-│   │   ├── ui/          # Base components (shadcn/ui)
-│   │   ├── layout/      # Layout components (sidebar, header)
-│   │   └── common/      # Shared components
-│   ├── pages/           # Application pages
-│   │   ├── Setup/       # Initial setup wizard
-│   │   ├── Dashboard/   # Home dashboard
-│   │   ├── Chat/        # AI chat interface
-│   │   ├── Channels/    # Channel management
-│   │   ├── Skills/      # Skill browser & manager
-│   │   ├── Cron/        # Scheduled tasks
-│   │   └── Settings/    # Configuration panels
-│   ├── stores/          # Zustand state stores
-│   ├── lib/             # Frontend utilities
-│   └── types/           # TypeScript type definitions
-├── resources/            # Static assets (icons, images)
-├── scripts/              # Build & utility scripts
-└── tests/               # Test suites
-```
+- **Package Manager**: pnpm 10+
 
 ### Available Commands
 
 ```bash
 # Development
 pnpm dev                  # Start with hot reload
-pnpm dev:electron         # Launch Electron directly
-
-# Quality
-pnpm lint                 # Run ESLint
-pnpm lint:fix             # Auto-fix issues
+pnpm lint                 # Run ESLint with auto-fix
 pnpm typecheck            # TypeScript validation
 
 # Testing
 pnpm test                 # Run unit tests
-pnpm test:watch           # Watch mode
-pnpm test:coverage        # Generate coverage report
-pnpm test:e2e             # Run Playwright E2E tests
+pnpm test:e2e             # Run E2E tests
 
 # Build & Package
 pnpm build                # Full production build
-pnpm package              # Package for current platform
-pnpm package:mac          # Package for macOS
-pnpm package:win          # Package for Windows
-pnpm package:linux        # Package for Linux
+pnpm package:mac          # Package for macOS (DMG + ZIP)
+pnpm package:win          # Package for Windows (NSIS installer)
+pnpm package:linux        # Package for Linux (AppImage, deb, rpm)
 ```
 
 ### Tech Stack
@@ -293,22 +227,74 @@ pnpm package:linux        # Package for Linux
 | State | Zustand |
 | Build | Vite + electron-builder |
 | Testing | Vitest + Playwright |
-| Animation | Framer Motion |
-| Icons | Lucide React |
+
+---
+
+## Architecture
+
+Oclaw uses a **dual-process architecture**:
+
+```
+┌─────────────────────────────────────┐
+│   Electron Main Process             │
+│   - Window & lifecycle management   │
+│   - Gateway process supervision     │
+│   - IPC handlers                    │
+│   - CLI mode detection              │
+└──────────────┬──────────────────────┘
+               │ IPC
+               ▼
+┌─────────────────────────────────────┐
+│   React Renderer Process            │
+│   - UI components (React 19)        │
+│   - State management (Zustand)      │
+│   - WebSocket client                │
+└──────────────┬──────────────────────┘
+               │ WebSocket (JSON-RPC)
+               ▼
+┌─────────────────────────────────────┐
+│   OpenClaw Gateway (Child Process)  │
+│   - AI agent runtime                │
+│   - Channel management              │
+│   - Skill execution                 │
+└─────────────────────────────────────┘
+```
+
+---
+
+## Relationship with ClawX
+
+Oclaw is a **fork** of ClawX with the following relationship:
+
+- **Upstream**: [ClawX](https://github.com/ValueCell-ai/ClawX) - Official OpenClaw desktop interface
+- **Downstream**: Oclaw - Enhanced version with additional features
+
+We periodically merge upstream changes from ClawX to stay current with the latest OpenClaw features and improvements.
+
+### When to Use Oclaw vs ClawX
+
+**Use Oclaw if you want:**
+- Dual CLI system for both app control and OpenClaw operations
+- Refined visual design with rounded icons
+- Enhanced Chinese localization
+- Specific customizations and optimizations
+
+**Use ClawX if you want:**
+- Official release from the OpenClaw team
+- Standard feature set without modifications
+- Direct upstream support
 
 ---
 
 ## Contributing
 
-We welcome contributions from the community! Whether it's bug fixes, new features, documentation improvements, or translations—every contribution helps make Oclaw better.
+We welcome contributions! Please follow these steps:
 
-### How to Contribute
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes with clear messages
-4. **Push** to your branch
-5. **Open** a Pull Request
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes with clear messages
+4. Push to your branch
+5. Open a Pull Request
 
 ### Guidelines
 
@@ -321,40 +307,22 @@ We welcome contributions from the community! Whether it's bug fixes, new feature
 
 ## Acknowledgments
 
-Oclaw is built on the shoulders of excellent open-source projects:
+Oclaw is built upon:
 
+- [ClawX](https://github.com/ValueCell-ai/ClawX) – The upstream project
 - [OpenClaw](https://github.com/OpenClaw) – The AI agent runtime
 - [Electron](https://www.electronjs.org/) – Cross-platform desktop framework
 - [React](https://react.dev/) – UI component library
-- [shadcn/ui](https://ui.shadcn.com/) – Beautifully designed components
-- [Zustand](https://github.com/pmndrs/zustand) – Lightweight state management
-
----
-
-## Community
-
-Join our community to connect with other users, get support, and share your experiences.
-
-| Enterprise WeChat | Feishu Group | Discord |
-| :---: | :---: | :---: |
-| <img src="src/assets/community/wecom-qr.png" width="150" alt="WeChat QR Code" /> | <img src="src/assets/community/feishu-qr.png" width="150" alt="Feishu QR Code" /> | <img src="src/assets/community/20260212-185822.png" width="150" alt="Discord QR Code" /> |
-
----
-
-## Star History
-
-<p align="center">
-  <img src="https://api.star-history.com/svg?repos=ValueCell-ai/Oclaw&type=Date" alt="Star History Chart" />
-</p>
+- [shadcn/ui](https://ui.shadcn.com/) – Component library
 
 ---
 
 ## License
 
-Oclaw is released under the [MIT License](LICENSE). You're free to use, modify, and distribute this software.
+Oclaw is released under the [MIT License](LICENSE).
 
 ---
 
 <p align="center">
-  <sub>Built with ❤️ by the ValueCell Team</sub>
+  <sub>Based on ClawX • Enhanced for specific use cases</sub>
 </p>
