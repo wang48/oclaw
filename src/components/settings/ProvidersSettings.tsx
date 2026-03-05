@@ -29,14 +29,39 @@ import {
   PROVIDER_TYPE_INFO,
   type ProviderType,
   getProviderIconUrl,
+  resolveProviderApiKeyForSave,
+  resolveProviderModelForSave,
+  shouldShowProviderModelId,
   shouldInvertInDark,
 } from '@/lib/providers';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { useSettingsStore } from '@/stores/settings';
+
+function normalizeFallbackProviderIds(ids?: string[]): string[] {
+  return Array.from(new Set((ids ?? []).filter(Boolean)));
+}
+
+function fallbackProviderIdsEqual(a?: string[], b?: string[]): boolean {
+  const left = normalizeFallbackProviderIds(a).sort();
+  const right = normalizeFallbackProviderIds(b).sort();
+  return left.length === right.length && left.every((id, index) => id === right[index]);
+}
+
+function normalizeFallbackModels(models?: string[]): string[] {
+  return Array.from(new Set((models ?? []).map((model) => model.trim()).filter(Boolean)));
+}
+
+function fallbackModelsEqual(a?: string[], b?: string[]): boolean {
+  const left = normalizeFallbackModels(a);
+  const right = normalizeFallbackModels(b);
+  return left.length === right.length && left.every((model, index) => model === right[index]);
+}
 
 export function ProvidersSettings() {
   const { t } = useTranslation('settings');
+  const devModeUnlocked = useSettingsStore((state) => state.devModeUnlocked);
   const {
     providers,
     defaultProviderId,
@@ -66,6 +91,7 @@ export function ProvidersSettings() {
     // Only custom supports multiple instances.
     // Built-in providers remain singleton by type.
     const id = type === 'custom' ? `custom-${crypto.randomUUID()}` : type;
+    const effectiveApiKey = resolveProviderApiKeyForSave(type, apiKey);
     try {
       await addProvider(
         {
@@ -76,7 +102,7 @@ export function ProvidersSettings() {
           model: options?.model,
           enabled: true,
         },
-        apiKey.trim() || undefined
+        effectiveApiKey
       );
 
       // Auto-set as default if no default is currently configured
@@ -142,6 +168,7 @@ export function ProvidersSettings() {
             <ProviderCard
               key={provider.id}
               provider={provider}
+              allProviders={providers}
               isDefault={provider.id === defaultProviderId}
               isEditing={editingProvider === provider.id}
               onEdit={() => setEditingProvider(provider.id)}
@@ -157,6 +184,7 @@ export function ProvidersSettings() {
                 setEditingProvider(null);
               }}
               onValidateKey={(key, options) => validateApiKey(provider.id, key, options)}
+              devModeUnlocked={devModeUnlocked}
             />
           ))}
         </div>
@@ -169,6 +197,7 @@ export function ProvidersSettings() {
           onClose={() => setShowAddDialog(false)}
           onAdd={handleAddProvider}
           onValidateKey={(type, key, options) => validateApiKey(type, key, options)}
+          devModeUnlocked={devModeUnlocked}
         />
       )}
     </div>
@@ -177,6 +206,7 @@ export function ProvidersSettings() {
 
 interface ProviderCardProps {
   provider: ProviderWithKeyInfo;
+  allProviders: ProviderWithKeyInfo[];
   isDefault: boolean;
   isEditing: boolean;
   onEdit: () => void;
@@ -188,12 +218,14 @@ interface ProviderCardProps {
     key: string,
     options?: { baseUrl?: string }
   ) => Promise<{ valid: boolean; error?: string }>;
+  devModeUnlocked: boolean;
 }
 
 
 
 function ProviderCard({
   provider,
+  allProviders,
   isDefault,
   isEditing,
   onEdit,
@@ -202,17 +234,25 @@ function ProviderCard({
   onSetDefault,
   onSaveEdits,
   onValidateKey,
+  devModeUnlocked,
 }: ProviderCardProps) {
   const { t } = useTranslation('settings');
   const [newKey, setNewKey] = useState('');
   const [baseUrl, setBaseUrl] = useState(provider.baseUrl || '');
   const [modelId, setModelId] = useState(provider.model || '');
+  const [fallbackModelsText, setFallbackModelsText] = useState(
+    normalizeFallbackModels(provider.fallbackModels).join('\n')
+  );
+  const [fallbackProviderIds, setFallbackProviderIds] = useState<string[]>(
+    normalizeFallbackProviderIds(provider.fallbackProviderIds)
+  );
   const [showKey, setShowKey] = useState(false);
   const [validating, setValidating] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const typeInfo = PROVIDER_TYPE_INFO.find((t) => t.id === provider.type);
-  const canEditConfig = Boolean(typeInfo?.showBaseUrl || typeInfo?.showModelId);
+  const showModelIdField = shouldShowProviderModelId(typeInfo, devModeUnlocked);
+  const canEditModelConfig = Boolean(typeInfo?.showBaseUrl || showModelIdField);
 
   useEffect(() => {
     if (isEditing) {
@@ -220,13 +260,26 @@ function ProviderCard({
       setShowKey(false);
       setBaseUrl(provider.baseUrl || '');
       setModelId(provider.model || '');
+      setFallbackModelsText(normalizeFallbackModels(provider.fallbackModels).join('\n'));
+      setFallbackProviderIds(normalizeFallbackProviderIds(provider.fallbackProviderIds));
     }
-  }, [isEditing, provider.baseUrl, provider.model]);
+  }, [isEditing, provider.baseUrl, provider.fallbackModels, provider.fallbackProviderIds, provider.model]);
+
+  const fallbackOptions = allProviders.filter((candidate) => candidate.id !== provider.id);
+
+  const toggleFallbackProvider = (providerId: string) => {
+    setFallbackProviderIds((current) => (
+      current.includes(providerId)
+        ? current.filter((id) => id !== providerId)
+        : [...current, providerId]
+    ));
+  };
 
   const handleSaveEdits = async () => {
     setSaving(true);
     try {
       const payload: { newApiKey?: string; updates?: Partial<ProviderConfig> } = {};
+      const normalizedFallbackModels = normalizeFallbackModels(fallbackModelsText.split('\n'));
 
       if (newKey.trim()) {
         setValidating(true);
@@ -242,23 +295,35 @@ function ProviderCard({
         payload.newApiKey = newKey.trim();
       }
 
-      if (canEditConfig) {
-        if (typeInfo?.showModelId && !modelId.trim()) {
+      {
+        if (showModelIdField && !modelId.trim()) {
           toast.error(t('aiProviders.toast.modelRequired'));
           setSaving(false);
           return;
         }
 
         const updates: Partial<ProviderConfig> = {};
-        if ((baseUrl.trim() || undefined) !== (provider.baseUrl || undefined)) {
+        if (typeInfo?.showBaseUrl && (baseUrl.trim() || undefined) !== (provider.baseUrl || undefined)) {
           updates.baseUrl = baseUrl.trim() || undefined;
         }
-        if ((modelId.trim() || undefined) !== (provider.model || undefined)) {
+        if (showModelIdField && (modelId.trim() || undefined) !== (provider.model || undefined)) {
           updates.model = modelId.trim() || undefined;
+        }
+        if (!fallbackModelsEqual(normalizedFallbackModels, provider.fallbackModels)) {
+          updates.fallbackModels = normalizedFallbackModels;
+        }
+        if (!fallbackProviderIdsEqual(fallbackProviderIds, provider.fallbackProviderIds)) {
+          updates.fallbackProviderIds = normalizeFallbackProviderIds(fallbackProviderIds);
         }
         if (Object.keys(updates).length > 0) {
           payload.updates = updates;
         }
+      }
+
+      // Keep Ollama key optional in UI, but persist a placeholder when
+      // editing legacy configs that have no stored key.
+      if (provider.type === 'ollama' && !provider.hasKey && !payload.newApiKey) {
+        payload.newApiKey = resolveProviderApiKeyForSave(provider.type, '') as string;
       }
 
       if (!payload.newApiKey && !payload.updates) {
@@ -300,9 +365,10 @@ function ProviderCard({
 
         {/* Key row */}
         {isEditing ? (
-          <div className="space-y-2">
-            {canEditConfig && (
-              <>
+          <div className="space-y-4">
+            {canEditModelConfig && (
+              <div className="space-y-3 rounded-md border p-3">
+                <p className="text-sm font-medium">{t('aiProviders.sections.model')}</p>
                 {typeInfo?.showBaseUrl && (
                   <div className="space-y-1">
                     <Label className="text-xs">{t('aiProviders.dialog.baseUrl')}</Label>
@@ -314,98 +380,169 @@ function ProviderCard({
                     />
                   </div>
                 )}
-                {typeInfo?.showModelId && (
+                {showModelIdField && (
                   <div className="space-y-1">
                     <Label className="text-xs">{t('aiProviders.dialog.modelId')}</Label>
                     <Input
                       value={modelId}
                       onChange={(e) => setModelId(e.target.value)}
-                      placeholder={typeInfo.modelIdPlaceholder || 'provider/model-id'}
+                      placeholder={typeInfo?.modelIdPlaceholder || 'provider/model-id'}
                       className="h-9 text-sm"
                     />
                   </div>
                 )}
-              </>
-            )}
-            {typeInfo?.apiKeyUrl && (
-              <div className="flex justify-start mb-1">
-                <a
-                  href={typeInfo.apiKeyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline flex items-center gap-1"
-                  tabIndex={-1}
-                >
-                  {t('aiProviders.oauth.getApiKey')} <ExternalLink className="h-3 w-3" />
-                </a>
               </div>
             )}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  type={showKey ? 'text' : 'password'}
-                  placeholder={typeInfo?.requiresApiKey ? typeInfo?.placeholder : (typeInfo?.id === 'ollama' ? t('aiProviders.notRequired') : t('aiProviders.card.editKey'))}
-                  value={newKey}
-                  onChange={(e) => setNewKey(e.target.value)}
-                  className="pr-10 h-9 text-sm"
+            <div className="space-y-3 rounded-md border p-3">
+              <p className="text-sm font-medium">{t('aiProviders.sections.fallback')}</p>
+              <div className="space-y-1">
+                <Label className="text-xs">{t('aiProviders.dialog.fallbackModelIds')}</Label>
+                <textarea
+                  value={fallbackModelsText}
+                  onChange={(e) => setFallbackModelsText(e.target.value)}
+                  placeholder={t('aiProviders.dialog.fallbackModelIdsPlaceholder')}
+                  className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                </button>
+                <p className="text-xs text-muted-foreground">
+                  {t('aiProviders.dialog.fallbackModelIdsHelp')}
+                </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSaveEdits}
-                disabled={
-                  validating
-                  || saving
-                  || (
-                    !newKey.trim()
-                    && (baseUrl.trim() || undefined) === (provider.baseUrl || undefined)
-                    && (modelId.trim() || undefined) === (provider.model || undefined)
-                  )
-                  || Boolean(typeInfo?.showModelId && !modelId.trim())
-                }
-              >
-                {validating || saving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <div className="space-y-2">
+                <Label className="text-xs">{t('aiProviders.dialog.fallbackProviders')}</Label>
+                {fallbackOptions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t('aiProviders.dialog.noFallbackOptions')}</p>
                 ) : (
-                  <Check className="h-3.5 w-3.5" />
+                  <div className="space-y-2 rounded-md border p-2">
+                    {fallbackOptions.map((candidate) => (
+                      <label key={candidate.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={fallbackProviderIds.includes(candidate.id)}
+                          onChange={() => toggleFallbackProvider(candidate.id)}
+                        />
+                        <span className="font-medium">{candidate.name}</span>
+                        <span className="text-xs text-muted-foreground">{candidate.model || candidate.type}</span>
+                      </label>
+                    ))}
+                  </div>
                 )}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={onCancelEdit}>
-                <X className="h-3.5 w-3.5" />
-              </Button>
+              </div>
+            </div>
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">{t('aiProviders.dialog.apiKey')}</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {provider.hasKey
+                      ? t('aiProviders.dialog.apiKeyConfigured')
+                      : t('aiProviders.dialog.apiKeyMissing')}
+                  </p>
+                </div>
+                {provider.hasKey ? (
+                  <Badge variant="secondary">{t('aiProviders.card.configured')}</Badge>
+                ) : null}
+              </div>
+              {typeInfo?.apiKeyUrl && (
+                <div className="flex justify-start">
+                  <a
+                    href={typeInfo.apiKeyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                    tabIndex={-1}
+                  >
+                    {t('aiProviders.oauth.getApiKey')} <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">{t('aiProviders.dialog.replaceApiKey')}</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={showKey ? 'text' : 'password'}
+                      placeholder={typeInfo?.requiresApiKey ? typeInfo?.placeholder : (typeInfo?.id === 'ollama' ? t('aiProviders.notRequired') : t('aiProviders.card.editKey'))}
+                      value={newKey}
+                      onChange={(e) => setNewKey(e.target.value)}
+                      className="pr-10 h-9 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSaveEdits}
+                    disabled={
+                      validating
+                      || saving
+                      || (
+                        !newKey.trim()
+                        && (baseUrl.trim() || undefined) === (provider.baseUrl || undefined)
+                        && (modelId.trim() || undefined) === (provider.model || undefined)
+                        && fallbackModelsEqual(normalizeFallbackModels(fallbackModelsText.split('\n')), provider.fallbackModels)
+                        && fallbackProviderIdsEqual(fallbackProviderIds, provider.fallbackProviderIds)
+                      )
+                      || Boolean(showModelIdField && !modelId.trim())
+                    }
+                  >
+                    {validating || saving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={onCancelEdit}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t('aiProviders.dialog.replaceApiKeyHelp')}
+                </p>
+              </div>
             </div>
           </div>
         ) : (
           <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
-            <div className="flex items-center gap-2 min-w-0">
-              {typeInfo?.isOAuth ? (
-                <>
-                  <Key className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <Badge variant="secondary" className="text-xs shrink-0">{t('aiProviders.card.configured')}</Badge>
-                </>
-              ) : (
-                <>
-                  <Key className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-mono text-muted-foreground truncate">
-                    {provider.hasKey
-                      ? (provider.keyMasked && provider.keyMasked.length > 12
-                        ? `${provider.keyMasked.substring(0, 4)}...${provider.keyMasked.substring(provider.keyMasked.length - 4)}`
-                        : provider.keyMasked)
-                      : t('aiProviders.card.noKey')}
-                  </span>
-                  {provider.hasKey && (
+            <div className="min-w-0 space-y-1">
+              <div className="flex items-center gap-2 min-w-0">
+                {typeInfo?.isOAuth ? (
+                  <>
+                    <Key className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <Badge variant="secondary" className="text-xs shrink-0">{t('aiProviders.card.configured')}</Badge>
-                  )}
-                </>
-              )}
+                  </>
+                ) : (
+                  <>
+                    <Key className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-sm font-mono text-muted-foreground truncate">
+                      {provider.hasKey
+                        ? (provider.keyMasked && provider.keyMasked.length > 12
+                          ? `${provider.keyMasked.substring(0, 4)}...${provider.keyMasked.substring(provider.keyMasked.length - 4)}`
+                          : provider.keyMasked)
+                        : t('aiProviders.card.noKey')}
+                    </span>
+                    {provider.hasKey && (
+                      <Badge variant="secondary" className="text-xs shrink-0">{t('aiProviders.card.configured')}</Badge>
+                    )}
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground truncate">
+                {t('aiProviders.card.fallbacks', {
+                  count: (provider.fallbackModels?.length ?? 0) + (provider.fallbackProviderIds?.length ?? 0),
+                  names: [
+                    ...normalizeFallbackModels(provider.fallbackModels),
+                    ...normalizeFallbackProviderIds(provider.fallbackProviderIds)
+                      .map((fallbackId) => allProviders.find((candidate) => candidate.id === fallbackId)?.name)
+                      .filter(Boolean),
+                  ].join(', ') || t('aiProviders.card.none'),
+                })}
+              </p>
             </div>
             <div className="flex gap-0.5 shrink-0 ml-2">
               <Button
@@ -453,9 +590,16 @@ interface AddProviderDialogProps {
     apiKey: string,
     options?: { baseUrl?: string }
   ) => Promise<{ valid: boolean; error?: string }>;
+  devModeUnlocked: boolean;
 }
 
-function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: AddProviderDialogProps) {
+function AddProviderDialog({
+  existingTypes,
+  onClose,
+  onAdd,
+  onValidateKey,
+  devModeUnlocked,
+}: AddProviderDialogProps) {
   const { t } = useTranslation('settings');
   const [selectedType, setSelectedType] = useState<ProviderType | null>(null);
   const [name, setName] = useState('');
@@ -478,6 +622,7 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
   const [authMode, setAuthMode] = useState<'oauth' | 'apikey'>('oauth');
 
   const typeInfo = PROVIDER_TYPE_INFO.find((t) => t.id === selectedType);
+  const showModelIdField = shouldShowProviderModelId(typeInfo, devModeUnlocked);
   const isOAuth = typeInfo?.isOAuth ?? false;
   const supportsApiKey = typeInfo?.supportsApiKey ?? false;
   // Effective OAuth mode: pure OAuth providers, or dual-mode with oauth selected
@@ -508,7 +653,14 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
       // If we call add() here with undefined baseUrl, it will overwrite and erase it!
       // So we just fetch the latest list from the backend to update the UI.
       try {
-        await useProviderStore.getState().fetchProviders();
+        const store = useProviderStore.getState();
+        await store.fetchProviders();
+
+        // Auto-set as default if no default is currently configured
+        if (!store.defaultProviderId && latestRef.current.selectedType) {
+          // Provider type is expected to match provider ID for built-in OAuth providers
+          await store.setDefaultProvider(latestRef.current.selectedType);
+        }
       } catch (err) {
         console.error('Failed to refresh providers after OAuth:', err);
       }
@@ -605,7 +757,7 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
         }
       }
 
-      const requiresModel = typeInfo?.showModelId ?? false;
+      const requiresModel = showModelIdField;
       if (requiresModel && !modelId.trim()) {
         setValidationError(t('aiProviders.toast.modelRequired'));
         setSaving(false);
@@ -618,7 +770,7 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
         apiKey.trim(),
         {
           baseUrl: baseUrl.trim() || undefined,
-          model: (typeInfo?.defaultModelId || modelId.trim()) || undefined,
+          model: resolveProviderModelForSave(typeInfo, modelId, devModeUnlocked),
         }
       );
     } catch {
@@ -776,12 +928,12 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
                 </div>
               )}
 
-              {typeInfo?.showModelId && (
+              {showModelIdField && (
                 <div className="space-y-2">
                   <Label htmlFor="modelId">{t('aiProviders.dialog.modelId')}</Label>
                   <Input
                     id="modelId"
-                    placeholder={typeInfo.modelIdPlaceholder || 'provider/model-id'}
+                    placeholder={typeInfo?.modelIdPlaceholder || 'provider/model-id'}
                     value={modelId}
                     onChange={(e) => {
                       setModelId(e.target.value);
@@ -894,7 +1046,7 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
             <Button
               onClick={handleAdd}
               className={cn(useOAuthFlow && "hidden")}
-              disabled={!selectedType || saving || ((typeInfo?.showModelId ?? false) && modelId.trim().length === 0)}
+              disabled={!selectedType || saving || (showModelIdField && modelId.trim().length === 0)}
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />

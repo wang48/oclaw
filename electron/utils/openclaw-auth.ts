@@ -358,7 +358,11 @@ export function buildProviderEnvVars(providers: Array<{ type: string; apiKey: st
  * Update the OpenClaw config to use the given provider and model
  * Writes to ~/.openclaw/openclaw.json
  */
-export async function setOpenClawDefaultModel(provider: string, modelOverride?: string): Promise<void> {
+export async function setOpenClawDefaultModel(
+  provider: string,
+  modelOverride?: string,
+  fallbackModels: string[] = []
+): Promise<void> {
   const config = await readOpenClawJson();
 
   const model = modelOverride || getProviderDefaultModel(provider);
@@ -370,11 +374,17 @@ export async function setOpenClawDefaultModel(provider: string, modelOverride?: 
   const modelId = model.startsWith(`${provider}/`)
     ? model.slice(provider.length + 1)
     : model;
+  const fallbackModelIds = fallbackModels
+    .filter((fallback) => fallback.startsWith(`${provider}/`))
+    .map((fallback) => fallback.slice(provider.length + 1));
 
   // Set the default model for the agents
   const agents = (config.agents || {}) as Record<string, unknown>;
   const defaults = (agents.defaults || {}) as Record<string, unknown>;
-  defaults.model = { primary: model };
+  defaults.model = {
+    primary: model,
+    fallbacks: fallbackModels,
+  };
   agents.defaults = defaults;
   config.agents = agents;
 
@@ -401,8 +411,10 @@ export async function setOpenClawDefaultModel(provider: string, modelOverride?: 
         mergedModels.push(item);
       }
     }
-    if (modelId && !mergedModels.some((m) => m.id === modelId)) {
-      mergedModels.push({ id: modelId, name: modelId });
+    for (const candidateModelId of [modelId, ...fallbackModelIds]) {
+      if (candidateModelId && !mergedModels.some((m) => m.id === candidateModelId)) {
+        mergedModels.push({ id: candidateModelId, name: candidateModelId });
+      }
     }
 
     const providerEntry: Record<string, unknown> = {
@@ -500,7 +512,8 @@ export async function syncProviderConfigToOpenClaw(
 export async function setOpenClawDefaultModelWithOverride(
   provider: string,
   modelOverride: string | undefined,
-  override: RuntimeProviderConfigOverride
+  override: RuntimeProviderConfigOverride,
+  fallbackModels: string[] = []
 ): Promise<void> {
   const config = await readOpenClawJson();
 
@@ -513,10 +526,16 @@ export async function setOpenClawDefaultModelWithOverride(
   const modelId = model.startsWith(`${provider}/`)
     ? model.slice(provider.length + 1)
     : model;
+  const fallbackModelIds = fallbackModels
+    .filter((fallback) => fallback.startsWith(`${provider}/`))
+    .map((fallback) => fallback.slice(provider.length + 1));
 
   const agents = (config.agents || {}) as Record<string, unknown>;
   const defaults = (agents.defaults || {}) as Record<string, unknown>;
-  defaults.model = { primary: model };
+  defaults.model = {
+    primary: model,
+    fallbacks: fallbackModels,
+  };
   agents.defaults = defaults;
   config.agents = agents;
 
@@ -525,7 +544,11 @@ export async function setOpenClawDefaultModelWithOverride(
     const providers = (models.providers || {}) as Record<string, unknown>;
 
     const nextModels: Array<Record<string, unknown>> = [];
-    if (modelId) nextModels.push({ id: modelId, name: modelId });
+    for (const candidateModelId of [modelId, ...fallbackModelIds]) {
+      if (candidateModelId && !nextModels.some((entry) => entry.id === candidateModelId)) {
+        nextModels.push({ id: candidateModelId, name: candidateModelId });
+      }
+    }
 
     const nextProvider: Record<string, unknown> = {
       baseUrl: override.baseUrl,
@@ -714,6 +737,53 @@ export async function updateAgentModelProvider(
     } catch (err) {
       console.warn(`Failed to update models.json for agent "${agentId}":`, err);
     }
+  }
+}
+
+/**
+ * Sanitize ~/.openclaw/openclaw.json before Gateway start.
+ *
+ * Removes known-invalid keys that cause OpenClaw's strict Zod validation
+ * to reject the entire config on startup.  Uses a conservative **blocklist**
+ * approach: only strips keys that are KNOWN to be misplaced by older
+ * OpenClaw/ClawX versions or external tools.
+ *
+ * Why blocklist instead of allowlist?
+ *   • Allowlist (e.g. `VALID_SKILLS_KEYS`) would strip any NEW valid keys
+ *     added by future OpenClaw releases — a forward-compatibility hazard.
+ *   • Blocklist only removes keys we positively know are wrong, so new
+ *     valid keys are never touched.
+ *
+ * This is a fast, file-based pre-check.  For comprehensive repair of
+ * unknown or future config issues, the reactive auto-repair mechanism
+ * (`runOpenClawDoctorRepair`) runs `openclaw doctor --fix` as a fallback.
+ */
+export async function sanitizeOpenClawConfig(): Promise<void> {
+  const config = await readOpenClawJson();
+  let modified = false;
+
+  // ── skills section ──────────────────────────────────────────────
+  // OpenClaw's Zod schema uses .strict() on the skills object, accepting
+  // only: allowBundled, load, install, limits, entries.
+  // The key "enabled" belongs inside skills.entries[key].enabled, NOT at
+  // the skills root level.  Older versions may have placed it there.
+  const skills = config.skills;
+  if (skills && typeof skills === 'object' && !Array.isArray(skills)) {
+    const skillsObj = skills as Record<string, unknown>;
+    // Keys that are known to be invalid at the skills root level.
+    const KNOWN_INVALID_SKILLS_ROOT_KEYS = ['enabled', 'disabled'];
+    for (const key of KNOWN_INVALID_SKILLS_ROOT_KEYS) {
+      if (key in skillsObj) {
+        console.log(`[sanitize] Removing misplaced key "skills.${key}" from openclaw.json`);
+        delete skillsObj[key];
+        modified = true;
+      }
+    }
+  }
+
+  if (modified) {
+    await writeOpenClawJson(config);
+    console.log('[sanitize] openclaw.json sanitized successfully');
   }
 }
 

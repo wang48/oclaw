@@ -88,8 +88,9 @@ export class ClawHubService {
 
             const isWin = process.platform === 'win32';
             const useShell = isWin && !this.useNodeRunner;
+            const { NODE_OPTIONS: _nodeOptions, ...baseEnv } = process.env;
             const env = {
-                ...process.env,
+                ...baseEnv,
                 CI: 'true',
                 FORCE_COLOR: '0',
             };
@@ -105,6 +106,7 @@ export class ClawHubService {
                     ...env,
                     CLAWHUB_WORKDIR: this.workDir,
                 },
+                windowsHide: true,
             });
 
             let stdout = '';
@@ -161,7 +163,7 @@ export class ClawHubService {
 
                 // Format could be: slug vversion description (score)
                 // Or sometimes: slug  vversion  description
-                const match = cleanLine.match(/^(\S+)\s+v?(\d+\.\S+)\s+(.+)$/);
+                let match = cleanLine.match(/^(\S+)\s+v?(\d+\.\S+)\s+(.+)$/);
                 if (match) {
                     const slug = match[1];
                     const version = match[2];
@@ -174,6 +176,24 @@ export class ClawHubService {
                         slug,
                         name: slug,
                         version,
+                        description,
+                    };
+                }
+
+                // Fallback for new clawhub search format without version:
+                // slug  name/description  (score)
+                match = cleanLine.match(/^(\S+)\s+(.+)$/);
+                if (match) {
+                    const slug = match[1];
+                    let description = match[2];
+
+                    // Clean up score if present at the end
+                    description = description.replace(/\(\d+\.\d+\)$/, '').trim();
+
+                    return {
+                        slug,
+                        name: slug,
+                        version: 'latest', // Fallback version since it's not provided
                         description,
                     };
                 }

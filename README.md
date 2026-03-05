@@ -135,6 +135,32 @@ The **Setup Wizard** will guide you through:
 3. **Skill Bundles** – Select pre-configured skills
 4. **Verification** – Test your configuration
 
+### Proxy Settings
+
+ClawX includes built-in proxy settings for environments where Electron, the OpenClaw Gateway, or channels such as Telegram need to reach the internet through a local proxy client.
+
+Open **Settings → Gateway → Proxy** and configure:
+
+- **Proxy Server**: the default proxy for all requests
+- **Bypass Rules**: hosts that should connect directly, separated by semicolons, commas, or new lines
+- In **Developer Mode**, you can optionally override:
+  - **HTTP Proxy**
+  - **HTTPS Proxy**
+  - **ALL_PROXY / SOCKS**
+
+Recommended local examples:
+
+```text
+Proxy Server: http://127.0.0.1:7890
+```
+
+Notes:
+
+- A bare `host:port` value is treated as HTTP.
+- If advanced proxy fields are left empty, ClawX falls back to `Proxy Server`.
+- Saving proxy settings reapplies Electron networking immediately and restarts the Gateway automatically.
+- ClawX also syncs the proxy to OpenClaw's Telegram channel config when Telegram is enabled.
+
 ---
 
 ## CLI Usage
@@ -202,19 +228,23 @@ openclaw --help
 
 ```bash
 # Development
+pnpm run init             # Install dependencies + download uv
 pnpm dev                  # Start with hot reload
+
+# Quality
 pnpm lint                 # Run ESLint with auto-fix
 pnpm typecheck            # TypeScript validation
 
 # Testing
 pnpm test                 # Run unit tests
-pnpm test:e2e             # Run E2E tests
 
 # Build & Package
-pnpm build                # Full production build
-pnpm package:mac          # Package for macOS (DMG + ZIP)
-pnpm package:win          # Package for Windows (NSIS installer)
-pnpm package:linux        # Package for Linux (AppImage, deb, rpm)
+pnpm run build:vite       # Build frontend only
+pnpm build                # Full production build (with packaging assets)
+pnpm package              # Package for current platform
+pnpm package:mac          # Package for macOS
+pnpm package:win          # Package for Windows
+pnpm package:linux        # Package for Linux
 ```
 
 ### Tech Stack

@@ -16,6 +16,7 @@ import {
   hasApiKey,
   saveProvider,
   getProvider,
+  getAllProviders,
   deleteProvider,
   setDefaultProvider,
   getDefaultProvider,
@@ -24,7 +25,7 @@ import {
 } from '../utils/secure-storage';
 import { getOpenClawStatus, getOpenClawDir, getOpenClawConfigDir, getOpenClawSkillsDir, ensureDir } from '../utils/paths';
 import { getOpenClawCliCommand } from '../utils/openclaw-cli';
-import { getSetting } from '../utils/store';
+import { getAllSettings, getSetting, resetSettings, setSetting, type AppSettings } from '../utils/store';
 import {
   saveProviderKeyToOpenClaw,
   removeProviderFromOpenClaw,
@@ -48,7 +49,11 @@ import { checkUvInstalled, installUv, setupManagedPython } from '../utils/uv-set
 import { updateSkillConfig, getSkillConfig, getAllSkillConfigs } from '../utils/skill-config';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { getProviderConfig } from '../utils/provider-registry';
+import { getProviderDefaultModel } from '../utils/provider-registry';
 import { deviceOAuthManager, OAuthProviderType } from '../utils/device-oauth';
+import { applyProxySettings } from './proxy';
+import { proxyAwareFetch } from '../utils/proxy-fetch';
+import { getRecentTokenUsageHistory } from '../utils/token-usage';
 
 /**
  * For custom/ollama providers, derive a unique key for OpenClaw config files
@@ -70,6 +75,54 @@ export function getOpenClawProviderKey(type: string, providerId: string): string
   return type;
 }
 
+function getProviderModelRef(config: ProviderConfig): string | undefined {
+  const providerKey = getOpenClawProviderKey(config.type, config.id);
+
+  if (config.model) {
+    return config.model.startsWith(`${providerKey}/`)
+      ? config.model
+      : `${providerKey}/${config.model}`;
+  }
+
+  return getProviderDefaultModel(config.type);
+}
+
+async function getProviderFallbackModelRefs(config: ProviderConfig): Promise<string[]> {
+  const allProviders = await getAllProviders();
+  const providerMap = new Map(allProviders.map((provider) => [provider.id, provider]));
+  const seen = new Set<string>();
+  const results: string[] = [];
+  const providerKey = getOpenClawProviderKey(config.type, config.id);
+
+  for (const fallbackModel of config.fallbackModels ?? []) {
+    const normalizedModel = fallbackModel.trim();
+    if (!normalizedModel) continue;
+
+    const modelRef = normalizedModel.startsWith(`${providerKey}/`)
+      ? normalizedModel
+      : `${providerKey}/${normalizedModel}`;
+
+    if (seen.has(modelRef)) continue;
+    seen.add(modelRef);
+    results.push(modelRef);
+  }
+
+  for (const fallbackId of config.fallbackProviderIds ?? []) {
+    if (!fallbackId || fallbackId === config.id) continue;
+
+    const fallbackProvider = providerMap.get(fallbackId);
+    if (!fallbackProvider) continue;
+
+    const modelRef = getProviderModelRef(fallbackProvider);
+    if (!modelRef || seen.has(modelRef)) continue;
+
+    seen.add(modelRef);
+    results.push(modelRef);
+  }
+
+  return results;
+}
+
 /**
  * Register all IPC handlers
  */
@@ -85,7 +138,7 @@ export function registerIpcHandlers(
   registerClawHubHandlers(clawHubService);
 
   // OpenClaw handlers
-  registerOpenClawHandlers(gatewayManager);
+  registerOpenClawHandlers();
 
   // Provider handlers
   registerProviderHandlers(gatewayManager);
@@ -96,14 +149,23 @@ export function registerIpcHandlers(
   // Dialog handlers
   registerDialogHandlers();
 
+  // Session handlers
+  registerSessionHandlers();
+
   // App handlers
   registerAppHandlers();
+
+  // Settings handlers
+  registerSettingsHandlers(gatewayManager);
 
   // UV handlers
   registerUvHandlers();
 
   // Log handlers (for UI to read gateway/app logs)
   registerLogHandlers();
+
+  // Usage handlers
+  registerUsageHandlers();
 
   // Skill config handlers (direct file access, no Gateway RPC)
   registerSkillConfigHandlers();
@@ -550,8 +612,8 @@ function registerGatewayHandlers(
 
       logger.info(`[chat:sendWithMedia] Sending: message="${message.substring(0, 100)}", attachments=${imageAttachments.length}, fileRefs=${fileReferences.length}`);
 
-      // Use a longer timeout when images are present (120s vs default 30s)
-      const timeoutMs = imageAttachments.length > 0 ? 120000 : 30000;
+      // Longer timeout for chat sends to tolerate high-latency networks (avoids connect error)
+      const timeoutMs = 120000;
       const result = await gatewayManager.rpc('chat.send', rpcParams, timeoutMs);
       logger.info(`[chat:sendWithMedia] RPC result: ${JSON.stringify(result)}`);
       return { success: true, result };
@@ -633,7 +695,7 @@ function registerGatewayHandlers(
  * OpenClaw-related IPC handlers
  * For checking package status and channel configuration
  */
-function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
+function registerOpenClawHandlers(): void {
   async function ensureDingTalkPluginInstalled(): Promise<{ installed: boolean; warning?: string }> {
     const targetDir = join(homedir(), '.openclaw', 'extensions', 'dingtalk');
     const targetManifest = join(targetDir, 'openclaw.plugin.json');
@@ -746,7 +808,9 @@ function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
           };
         }
         await saveChannelConfig(channelType, config);
-        gatewayManager.debouncedRestart();
+        logger.info(
+          `Skipping app-forced Gateway restart after channel:saveConfig (${channelType}); Gateway handles channel config reload/restart internally`
+        );
         return {
           success: true,
           pluginInstalled: installResult.installed,
@@ -754,8 +818,12 @@ function registerOpenClawHandlers(gatewayManager: GatewayManager): void {
         };
       }
       await saveChannelConfig(channelType, config);
-      // Debounced restart so the gateway picks up the new channel config.
-      gatewayManager.debouncedRestart();
+      // Do not force stop/start here. Recent Gateway builds detect channel config
+      // changes and perform an internal service restart; forcing another restart
+      // from Electron can race with reconnect and kill the newly spawned process.
+      logger.info(
+        `Skipping app-forced Gateway restart after channel:saveConfig (${channelType}); waiting for Gateway internal channel reload`
+      );
       return { success: true };
     } catch (error) {
       console.error('Failed to save channel config:', error);
@@ -1098,6 +1166,7 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
 
         // Sync the provider configuration to openclaw.json so Gateway knows about it
         try {
+          const fallbackModels = await getProviderFallbackModelRefs(nextConfig);
           const meta = getProviderConfig(nextConfig.type);
           const api = nextConfig.type === 'custom' || nextConfig.type === 'ollama' ? 'openai-completions' : meta?.api;
 
@@ -1132,12 +1201,12 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
               ? `${ock}/${nextConfig.model}`
               : undefined;
             if (nextConfig.type !== 'custom' && nextConfig.type !== 'ollama') {
-              await setOpenClawDefaultModel(nextConfig.type, modelOverride);
+              await setOpenClawDefaultModel(ock, modelOverride, fallbackModels);
             } else {
               await setOpenClawDefaultModelWithOverride(ock, modelOverride, {
                 baseUrl: nextConfig.baseUrl,
                 api: 'openai-completions',
-              });
+              }, fallbackModels);
             }
           }
 
@@ -1213,6 +1282,7 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
         try {
           const ock = getOpenClawProviderKey(provider.type, providerId);
           const providerKey = await getApiKey(providerId);
+          const fallbackModels = await getProviderFallbackModelRefs(provider);
 
           // OAuth providers (qwen-portal, minimax-portal, minimax-portal-cn) might use OAuth OR a direct API key.
           // Treat them as OAuth only if they don't have a local API key configured.
@@ -1231,9 +1301,9 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
               await setOpenClawDefaultModelWithOverride(ock, modelOverride, {
                 baseUrl: provider.baseUrl,
                 api: 'openai-completions',
-              });
+              }, fallbackModels);
             } else {
-              await setOpenClawDefaultModel(provider.type, modelOverride);
+              await setOpenClawDefaultModel(ock, modelOverride, fallbackModels);
             }
 
             // Keep auth-profiles in sync with the default provider instance.
@@ -1261,13 +1331,13 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
               ? 'minimax-portal'
               : provider.type;
 
-            await setOpenClawDefaultModelWithOverride(targetProviderKey, undefined, {
+            await setOpenClawDefaultModelWithOverride(targetProviderKey, getProviderModelRef(provider), {
               baseUrl,
               api,
               authHeader: targetProviderKey === 'minimax-portal' ? true : undefined,
               // Relies on OpenClaw Gateway native auth-profiles syncing
               apiKeyEnv: targetProviderKey === 'minimax-portal' ? 'minimax-oauth' : 'qwen-oauth',
-            });
+            }, fallbackModels);
 
             logger.info(`Configured openclaw.json for OAuth provider "${provider.type}"`);
 
@@ -1303,7 +1373,10 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
           }
 
           // Debounced restart so the gateway picks up the new default provider.
-          if (gatewayManager.isConnected()) {
+          // Because OAuth success triggers a debounced restart, the gateway might not be
+          // currently connected ('starting' or 'reconnecting'). Checking if it is simply
+          // not 'stopped' ensures the restart request is correctly queued or coalesced.
+          if (gatewayManager.getStatus().state !== 'stopped') {
             logger.info(`Scheduling Gateway restart after provider switch to "${ock}"`);
             gatewayManager.debouncedRestart();
           }
@@ -1474,7 +1547,7 @@ async function performProviderValidationRequest(
 ): Promise<{ valid: boolean; error?: string }> {
   try {
     logValidationRequest(providerLabel, 'GET', url, headers);
-    const response = await fetch(url, { headers });
+    const response = await proxyAwareFetch(url, { headers });
     logValidationStatus(providerLabel, response.status);
     const data = await response.json().catch(() => ({}));
     return classifyAuthResponse(response.status, data);
@@ -1549,7 +1622,7 @@ async function performChatCompletionsProbe(
 ): Promise<{ valid: boolean; error?: string }> {
   try {
     logValidationRequest(providerLabel, 'POST', url, headers);
-    const response = await fetch(url, {
+    const response = await proxyAwareFetch(url, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1751,6 +1824,75 @@ function registerAppHandlers(): void {
   });
 }
 
+function registerSettingsHandlers(gatewayManager: GatewayManager): void {
+  const handleProxySettingsChange = async () => {
+    const settings = await getAllSettings();
+    await applyProxySettings(settings);
+    if (gatewayManager.getStatus().state === 'running') {
+      await gatewayManager.restart();
+    }
+  };
+
+  ipcMain.handle('settings:get', async (_, key: keyof AppSettings) => {
+    return await getSetting(key);
+  });
+
+  ipcMain.handle('settings:getAll', async () => {
+    return await getAllSettings();
+  });
+
+  ipcMain.handle('settings:set', async (_, key: keyof AppSettings, value: AppSettings[keyof AppSettings]) => {
+    await setSetting(key, value as never);
+
+    if (
+      key === 'proxyEnabled' ||
+      key === 'proxyServer' ||
+      key === 'proxyHttpServer' ||
+      key === 'proxyHttpsServer' ||
+      key === 'proxyAllServer' ||
+      key === 'proxyBypassRules'
+    ) {
+      await handleProxySettingsChange();
+    }
+
+    return { success: true };
+  });
+
+  ipcMain.handle('settings:setMany', async (_, patch: Partial<AppSettings>) => {
+    const entries = Object.entries(patch) as Array<[keyof AppSettings, AppSettings[keyof AppSettings]]>;
+    for (const [key, value] of entries) {
+      await setSetting(key, value as never);
+    }
+
+    if (entries.some(([key]) =>
+      key === 'proxyEnabled' ||
+      key === 'proxyServer' ||
+      key === 'proxyHttpServer' ||
+      key === 'proxyHttpsServer' ||
+      key === 'proxyAllServer' ||
+      key === 'proxyBypassRules'
+    )) {
+      await handleProxySettingsChange();
+    }
+
+    return { success: true };
+  });
+
+  ipcMain.handle('settings:reset', async () => {
+    await resetSettings();
+    const settings = await getAllSettings();
+    await handleProxySettingsChange();
+    return { success: true, settings };
+  });
+}
+function registerUsageHandlers(): void {
+  ipcMain.handle('usage:recentTokenHistory', async (_, limit?: number) => {
+    const safeLimit = typeof limit === 'number' && Number.isFinite(limit)
+      ? Math.max(Math.floor(limit), 1)
+      : undefined;
+    return await getRecentTokenUsageHistory(safeLimit);
+  });
+}
 /**
  * Window control handlers (for custom title bar on Windows/Linux)
  */
@@ -1979,3 +2121,143 @@ function registerFileHandlers(): void {
     return results;
   });
 }
+
+/**
+ * Session IPC handlers
+ *
+ * Performs a soft-delete of a session's JSONL transcript on disk.
+ * sessionKey format: "agent:<agentId>:<suffix>" — e.g. "agent:main:session-1234567890".
+ * The JSONL file lives at: ~/.openclaw/agents/<agentId>/sessions/<suffix>.jsonl
+ * Renaming to <suffix>.deleted.jsonl hides it from sessions.list and token-usage
+ * (both already filter out filenames containing ".deleted.").
+ */
+function registerSessionHandlers(): void {
+  ipcMain.handle('session:delete', async (_, sessionKey: string) => {
+    try {
+      if (!sessionKey || !sessionKey.startsWith('agent:')) {
+        return { success: false, error: `Invalid sessionKey: ${sessionKey}` };
+      }
+
+      const parts = sessionKey.split(':');
+      if (parts.length < 3) {
+        return { success: false, error: `sessionKey has too few parts: ${sessionKey}` };
+      }
+
+      const agentId = parts[1];
+      const openclawConfigDir = getOpenClawConfigDir();
+      const sessionsDir = join(openclawConfigDir, 'agents', agentId, 'sessions');
+      const sessionsJsonPath = join(sessionsDir, 'sessions.json');
+
+      logger.info(`[session:delete] key=${sessionKey} agentId=${agentId}`);
+      logger.info(`[session:delete] sessionsJson=${sessionsJsonPath}`);
+
+      const fsP = await import('fs/promises');
+
+      // ── Step 1: read sessions.json to find the UUID file for this sessionKey ──
+      let sessionsJson: Record<string, unknown> = {};
+      try {
+        const raw = await fsP.readFile(sessionsJsonPath, 'utf8');
+        sessionsJson = JSON.parse(raw) as Record<string, unknown>;
+      } catch (e) {
+        logger.warn(`[session:delete] Could not read sessions.json: ${String(e)}`);
+        return { success: false, error: `Could not read sessions.json: ${String(e)}` };
+      }
+
+      // sessions.json structure: try common shapes used by OpenClaw Gateway:
+      //   Shape A (array):  { sessions: [{ key, file, ... }] }
+      //   Shape B (object): { [sessionKey]: { file, ... } }
+      //   Shape C (array):  { sessions: [{ key, id, ... }] }  — id is the UUID
+      let uuidFileName: string | undefined;
+
+      // Shape A / C — array under "sessions" key
+      if (Array.isArray(sessionsJson.sessions)) {
+        const entry = (sessionsJson.sessions as Array<Record<string, unknown>>)
+          .find((s) => s.key === sessionKey || s.sessionKey === sessionKey);
+        if (entry) {
+          // Could be "file", "fileName", "id" + ".jsonl", or "path"
+          uuidFileName = (entry.file ?? entry.fileName ?? entry.path) as string | undefined;
+          if (!uuidFileName && typeof entry.id === 'string') {
+            uuidFileName = `${entry.id}.jsonl`;
+          }
+        }
+      }
+
+      // Shape B — flat object keyed by sessionKey; value may be a string or an object.
+      // Actual Gateway format: { sessionFile: "/abs/path/uuid.jsonl", sessionId: "uuid", ... }
+      let resolvedSrcPath: string | undefined;
+
+      if (!uuidFileName && sessionsJson[sessionKey] != null) {
+        const val = sessionsJson[sessionKey];
+        if (typeof val === 'string') {
+          uuidFileName = val;
+        } else if (typeof val === 'object' && val !== null) {
+          const entry = val as Record<string, unknown>;
+          // Priority: absolute sessionFile path > relative file/fileName/path > id/sessionId as UUID
+          const absFile = (entry.sessionFile ?? entry.file ?? entry.fileName ?? entry.path) as string | undefined;
+          if (absFile) {
+            if (absFile.startsWith('/') || absFile.match(/^[A-Za-z]:\\/)) {
+              // Absolute path — use directly
+              resolvedSrcPath = absFile;
+            } else {
+              uuidFileName = absFile;
+            }
+          } else {
+            // Fall back to UUID fields
+            const uuidVal = (entry.id ?? entry.sessionId) as string | undefined;
+            if (uuidVal) uuidFileName = uuidVal.endsWith('.jsonl') ? uuidVal : `${uuidVal}.jsonl`;
+          }
+        }
+      }
+
+      if (!uuidFileName && !resolvedSrcPath) {
+        const rawVal = sessionsJson[sessionKey];
+        logger.warn(`[session:delete] Cannot resolve file for "${sessionKey}". Raw value: ${JSON.stringify(rawVal)}`);
+        return { success: false, error: `Cannot resolve file for session: ${sessionKey}` };
+      }
+
+      // Normalise: if we got a relative filename, resolve it against sessionsDir
+      if (!resolvedSrcPath) {
+        if (!uuidFileName!.endsWith('.jsonl')) uuidFileName = `${uuidFileName}.jsonl`;
+        resolvedSrcPath = join(sessionsDir, uuidFileName!);
+      }
+
+      const dstPath = resolvedSrcPath.replace(/\.jsonl$/, '.deleted.jsonl');
+      logger.info(`[session:delete] file: ${resolvedSrcPath}`);
+
+      // ── Step 2: rename the JSONL file ──
+      try {
+        await fsP.access(resolvedSrcPath);
+        await fsP.rename(resolvedSrcPath, dstPath);
+        logger.info(`[session:delete] Renamed ${resolvedSrcPath} → ${dstPath}`);
+      } catch (e) {
+        logger.warn(`[session:delete] Could not rename file: ${String(e)}`);
+      }
+
+      // ── Step 3: remove the entry from sessions.json ──
+      try {
+        // Re-read to avoid race conditions
+        const raw2 = await fsP.readFile(sessionsJsonPath, 'utf8');
+        const json2 = JSON.parse(raw2) as Record<string, unknown>;
+
+        if (Array.isArray(json2.sessions)) {
+          json2.sessions = (json2.sessions as Array<Record<string, unknown>>)
+            .filter((s) => s.key !== sessionKey && s.sessionKey !== sessionKey);
+        } else if (json2[sessionKey]) {
+          delete json2[sessionKey];
+        }
+
+        await fsP.writeFile(sessionsJsonPath, JSON.stringify(json2, null, 2), 'utf8');
+        logger.info(`[session:delete] Removed "${sessionKey}" from sessions.json`);
+      } catch (e) {
+        logger.warn(`[session:delete] Could not update sessions.json: ${String(e)}`);
+        // Non-fatal — JSONL rename already done
+      }
+
+      return { success: true };
+    } catch (err) {
+      logger.error(`[session:delete] Unexpected error for ${sessionKey}:`, err);
+      return { success: false, error: String(err) };
+    }
+  });
+}
+

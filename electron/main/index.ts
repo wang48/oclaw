@@ -19,19 +19,12 @@ import { autoInstallCliIfNeeded, generateCompletionCache, installCompletionToPro
 import { isQuitting, setQuitting } from './app-state';
 import { isCliInvocationArgs } from './cli/args';
 import { runCli } from './cli/index';
+import { applyProxySettings } from './proxy';
+import { getSetting } from '../utils/store';
+import { ensureBuiltinSkillsInstalled } from '../utils/skill-config';
 
-// Check for CLI mode before initializing GUI
 const cliArgs = process.argv.slice(1);
-if (isCliInvocationArgs(cliArgs)) {
-  // CLI mode: run command and exit
-  app.whenReady().then(async () => {
-    const exitCode = await runCli(cliArgs);
-    app.exit(exitCode);
-  });
-  // Skip the rest of the file in CLI mode
-} else {
-  // GUI mode: continue with normal initialization below
-}
+const cliMode = isCliInvocationArgs(cliArgs);
 
 // Disable GPU hardware acceleration globally for maximum stability across
 // all GPU configurations (no GPU, integrated, discrete).
@@ -48,6 +41,15 @@ if (isCliInvocationArgs(cliArgs)) {
 // Users who want GPU acceleration can pass `--enable-gpu` on the CLI or
 // set `"disable-hardware-acceleration": false` in the app config (future).
 app.disableHardwareAcceleration();
+
+// Prevent multiple instances of the app from running simultaneously.
+// Without this, two instances each spawn their own gateway process on the
+// same port, then each treats the other's gateway as "orphaned" and kills
+// it — creating an infinite kill/restart loop on Windows.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+}
 
 // Global references
 let mainWindow: BrowserWindow | null = null;
@@ -142,6 +144,9 @@ async function initialize(): Promise<void> {
   // Warm up network optimization (non-blocking)
   void warmupNetworkOptimization();
 
+  // Apply persisted proxy settings before creating windows or network requests.
+  await applyProxySettings();
+
   // Set application menu
   createMenu();
 
@@ -202,14 +207,25 @@ async function initialize(): Promise<void> {
     logger.warn('Failed to repair bootstrap files:', error);
   });
 
+  // Pre-deploy built-in skills (feishu-doc, feishu-drive, feishu-perm, feishu-wiki)
+  // to ~/.openclaw/skills/ so they are immediately available without manual install.
+  void ensureBuiltinSkillsInstalled().catch((error) => {
+    logger.warn('Failed to install built-in skills:', error);
+  });
+
   // Start Gateway automatically (this seeds missing bootstrap files with full templates)
-  try {
-    logger.debug('Auto-starting Gateway...');
-    await gatewayManager.start();
-    logger.info('Gateway auto-start succeeded');
-  } catch (error) {
-    logger.error('Gateway auto-start failed:', error);
-    mainWindow?.webContents.send('gateway:error', String(error));
+  const gatewayAutoStart = await getSetting('gatewayAutoStart');
+  if (gatewayAutoStart) {
+    try {
+      logger.debug('Auto-starting Gateway...');
+      await gatewayManager.start();
+      logger.info('Gateway auto-start succeeded');
+    } catch (error) {
+      logger.error('Gateway auto-start failed:', error);
+      mainWindow?.webContents.send('gateway:error', String(error));
+    }
+  } else {
+    logger.info('Gateway auto-start disabled in settings');
   }
 
   // Merge Oclaw context snippets into the workspace bootstrap files.
@@ -240,37 +256,53 @@ async function initialize(): Promise<void> {
   });
 }
 
-// Application lifecycle
-app.whenReady().then(() => {
-  initialize();
-
-  // Register activate handler AFTER app is ready to prevent
-  // "Cannot create BrowserWindow before app is ready" on macOS.
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      mainWindow = createWindow();
-    } else if (mainWindow && !mainWindow.isDestroyed()) {
-      // On macOS, clicking the dock icon should show the window if it's hidden
+// When a second instance is launched, focus the existing window instead.
+if (!cliMode) {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
     }
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+  // Application lifecycle
+  app.whenReady().then(() => {
+    initialize();
 
-app.on('before-quit', () => {
-  setQuitting();
-  // Fire-and-forget: do not await gatewayManager.stop() here.
-  // Awaiting inside before-quit can stall Electron's quit sequence.
-  void gatewayManager.stop().catch((err) => {
-    logger.warn('gatewayManager.stop() error during quit:', err);
+    // Register activate handler AFTER app is ready to prevent
+    // "Cannot create BrowserWindow before app is ready" on macOS.
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        mainWindow = createWindow();
+      } else if (mainWindow && !mainWindow.isDestroyed()) {
+        // On macOS, clicking the dock icon should show the window if it's hidden
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    });
   });
-});
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
+
+  app.on('before-quit', () => {
+    setQuitting();
+    // Fire-and-forget: do not await gatewayManager.stop() here.
+    // Awaiting inside before-quit can stall Electron's quit sequence.
+    void gatewayManager.stop().catch((err) => {
+      logger.warn('gatewayManager.stop() error during quit:', err);
+    });
+  });
+} else {
+  app.whenReady().then(async () => {
+    const exitCode = await runCli(cliArgs);
+    app.exit(exitCode);
+  });
+}
 
 // Export for testing
 export { mainWindow, gatewayManager };
