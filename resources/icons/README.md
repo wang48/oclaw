@@ -6,12 +6,11 @@ This directory contains the application icons for all supported platforms.
 
 | File | Platform | Description |
 |------|----------|-------------|
-| `icon.svg` | Source | Vector source for all icons |
+| `oclaw-no-text.jpg` | Source | Primary source image for branded icons |
 | `icon.icns` | macOS | Apple Icon Image format |
 | `icon.ico` | Windows | Windows ICO format |
 | `icon.png` | All | 512x512 PNG fallback |
 | `16x16.png` - `512x512.png` | Linux | PNG set for Linux |
-| `tray-icon-template.svg` | Source | macOS tray icon template source |
 | `tray-icon-Template.png` | macOS | 22x22 status bar icon (note: "Template" suffix required) |
 
 ## Generating Icons
@@ -59,21 +58,19 @@ If you prefer to generate icons manually:
 
 ### Application Icon
 - **Corner Radius**: ~20% of width (200px on 1024px canvas)
-- **Foreground**: White claw symbol with "X" accent
+- **Foreground**: Oclaw mascot artwork
 - **Safe Area**: Keep 10% margin from edges
 
 ### macOS Tray Icon
 - **Format**: Single-color (black) on transparent background
 - **Size**: 22x22 pixels (system automatically handles @2x retina)
 - **Naming**: Must end with "Template.png" for automatic template mode
-- **Design**: Simplified monochrome version of main icon (Oclaw logo)
-- **Source**: Use `tray-icon-template.svg` as the source
+- **Design**: Simplified monochrome silhouette derived from the Oclaw mascot
 - **Important**: Must be pure black (#000000) on transparent background - no gradients or colors
 
 ## Updating the Icon
 
-1. Edit `icon.svg` with your vector editor (Figma, Illustrator, Inkscape)
-2. For macOS tray icon, edit `tray-icon-template.svg` (must be single-color black on transparent)
-3. Run `node scripts/generate-icons.mjs`
-4. Verify generated icons look correct
-5. Commit all generated files
+1. Update `oclaw-no-text.jpg` with the latest branded artwork
+2. Run `node scripts/generate-icons.mjs`
+3. Verify generated icons look correct
+4. Commit all generated files

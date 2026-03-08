@@ -62,7 +62,7 @@ mac:
     - from: resources/cli/posix/
       to: cli/
   category: public.app-category.productivity
-  icon: resources/icons/oclaw-icon.icns
+  icon: resources/icons/icon.icns
   target:
     - target: dmg
       arch:
@@ -84,7 +84,7 @@ mac:
 
 dmg:
   background: resources/dmg-background.png
-  icon: resources/icons/oclaw-icon.icns
+  icon: resources/icons/icon.icns
   iconSize: 100
   window:
     width: 540
@@ -108,7 +108,7 @@ win:
       to: bin
     - from: resources/cli/win32/
       to: cli/
-  icon: resources/icons/oclaw-icon.ico
+  icon: resources/icons/icon.ico
   target:
     - target: nsis
       arch:
@@ -130,8 +130,8 @@ nsis:
   uninstallDisplayName: Oclaw
   license: LICENSE
   include: scripts/installer.nsh
-  installerIcon: resources/icons/oclaw-icon.ico
-  uninstallerIcon: resources/icons/oclaw-icon.ico
+  installerIcon: resources/icons/icon.ico
+  uninstallerIcon: resources/icons/icon.ico
 
 # Linux Configuration
 linux:

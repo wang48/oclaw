@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="src/assets/oclaw-logo.svg" width="128" height="128" alt="Oclaw Logo" />
+  <img src="src/assets/logo.png" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
 <h1 align="center">Oclaw</h1>
