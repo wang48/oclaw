@@ -2,18 +2,16 @@
  * Auto-Updater Module
  * Handles automatic application updates using electron-updater
  *
- * Update providers are configured in electron-builder.yml (OSS primary, GitHub fallback).
- * For prerelease channels (alpha, beta), the feed URL is overridden at runtime
- * to point at the channel-specific OSS directory (e.g. /alpha/, /beta/).
+ * Update providers are configured in electron-builder.yml.
+ * Oclaw currently uses its own GitHub Releases feed.
+ * The electron-builder config keeps a commented OSS template so a future
+ * self-hosted generic feed can be enabled without rediscovering the shape.
  */
 import { autoUpdater, UpdateInfo, ProgressInfo, UpdateDownloadedEvent } from 'electron-updater';
 import { BrowserWindow, app, ipcMain } from 'electron';
 import { logger } from '../utils/logger';
 import { EventEmitter } from 'events';
 import { setQuitting } from './app-state';
-
-/** Base CDN URL (without trailing channel path) */
-const OSS_BASE_URL = 'https://oss.intelli-spectrum.com';
 
 export interface UpdateStatus {
   status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
@@ -63,23 +61,16 @@ export class AppUpdater extends EventEmitter {
       debug: (msg: string) => logger.debug('[Updater]', msg),
     };
 
-    // Override feed URL for prerelease channels so that
-    // alpha -> /alpha/alpha-mac.yml, beta -> /beta/beta-mac.yml, etc.
     const version = app.getVersion();
     const channel = detectChannel(version);
-    const feedUrl = `${OSS_BASE_URL}/${channel}`;
+    const allowPrerelease = channel !== 'latest';
 
-    logger.info(`[Updater] Version: ${version}, channel: ${channel}, feedUrl: ${feedUrl}`);
+    logger.info(`[Updater] Version: ${version}, channel: ${channel}, provider: github, repo: wang48/oclaw`);
 
-    // Set channel so electron-updater requests the correct yml filename.
-    // e.g. channel "alpha" → requests alpha-mac.yml, channel "latest" → requests latest-mac.yml
+    // Keep prerelease channels enabled for alpha/beta builds so the updater
+    // can discover prerelease GitHub releases from this repository.
     autoUpdater.channel = channel;
-
-    autoUpdater.setFeedURL({
-      provider: 'generic',
-      url: feedUrl,
-      useMultipleRangeRequest: false,
-    });
+    autoUpdater.allowPrerelease = allowPrerelease;
 
     this.setupListeners();
   }
@@ -260,7 +251,8 @@ export class AppUpdater extends EventEmitter {
    * Set update channel (stable, beta, dev)
    */
   setChannel(channel: 'stable' | 'beta' | 'dev'): void {
-    autoUpdater.channel = channel;
+    autoUpdater.channel = channel === 'stable' ? 'latest' : channel;
+    autoUpdater.allowPrerelease = channel !== 'stable';
   }
 
   /**

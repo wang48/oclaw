@@ -754,7 +754,7 @@ export function Settings() {
             <Button
               variant="link"
               className="h-auto p-0"
-              onClick={() => window.electron.openExternal('https://github.com/ValueCell-ai/Oclaw')}
+              onClick={() => window.electron.openExternal('https://github.com/wang48/oclaw')}
             >
               {t('about.github')}
             </Button>

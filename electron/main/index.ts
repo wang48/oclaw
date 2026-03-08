@@ -50,11 +50,10 @@ if (process.platform === 'linux') {
   app.setDesktopName('oclaw.desktop');
 }
 
-// Prevent multiple instances of the app from running simultaneously.
-// Without this, two instances each spawn their own gateway process on the
-// same port, then each treats the other's gateway as "orphaned" and kills
-// it — creating an infinite kill/restart loop on Windows.
-const gotTheLock = app.requestSingleInstanceLock();
+// Prevent multiple GUI instances of the app from running simultaneously.
+// CLI invocations must bypass this lock; otherwise `oclaw -h` or `oclaw ps`
+// will silently exit whenever the desktop app is already running.
+const gotTheLock = cliMode ? true : app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 }

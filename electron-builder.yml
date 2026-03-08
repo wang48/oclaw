@@ -44,15 +44,19 @@ asarUnpack:
 npmRebuild: false
 
 # Auto-update configuration
-# Primary: Alibaba Cloud OSS (fast for Chinese users, used for auto-update)
-# Fallback: GitHub Releases (backup, used when OSS is unavailable)
+# Current default: Oclaw's own GitHub Releases feed.
+# Optional OSS template retained for future migration:
+# publish:
+#   - provider: generic
+#     url: https://your-oss-domain.example.com/latest
+#     useMultipleRangeRequest: false
+#   - provider: github
+#     owner: wang48
+#     repo: oclaw
 publish:
-  - provider: generic
-    url: https://oss.intelli-spectrum.com/latest
-    useMultipleRangeRequest: false
   - provider: github
-    owner: ValueCell-ai
-    repo: Oclaw
+    owner: wang48
+    repo: oclaw
 
 # macOS Configuration
 mac:
