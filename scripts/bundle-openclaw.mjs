@@ -153,7 +153,9 @@ while (queue.length > 0) {
 
     let realPath;
     try {
-      realPath = fs.realpathSync(normWin(fullPath));
+      // realpathSync does not accept the Windows \\?\ prefix reliably.
+      // Keep the original path here and reserve normWin for copy/mkdir calls.
+      realPath = fs.realpathSync(fullPath);
     } catch {
       continue; // broken symlink, skip
     }
