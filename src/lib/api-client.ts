@@ -650,9 +650,9 @@ export function createGatewayWsTransportInvoker(options: GatewayWsTransportOptio
         minProtocol: 3,
         maxProtocol: 3,
         client: {
-          id: 'clawx-ui',
-          displayName: 'ClawX UI',
-          version: '0.1.0',
+          id: 'oclaw-ui',
+          displayName: 'Oclaw UI',
+          version: '0.1.0-alpha.2',
           platform: window.electron?.platform ?? 'unknown',
           mode: 'ui',
         },
