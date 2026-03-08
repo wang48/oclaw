@@ -4,11 +4,11 @@
 import { app } from 'electron';
 import { GatewayManager } from '../../gateway/manager';
 import { ClawHubService } from '../../gateway/clawhub';
-import { LogLevel, setLogLevel } from '../../utils/logger';
+import { LogLevel, logger, setLogLevel } from '../../utils/logger';
 import { resolveCliArgs } from './args';
 import { printJson, printHuman, printQuiet } from './output';
 import { printHelp } from './help';
-import type { CommandContext, CommandResult } from './types';
+import { CliError, type CommandContext, type CommandResult } from './types';
 
 // Command handlers
 import { handleStatus } from './commands/status';
@@ -22,6 +22,7 @@ import { handleClawHub } from './commands/clawhub';
 import { handleOpenClaw } from './commands/openclaw';
 import { handleUv } from './commands/uv';
 import { handleCompletion } from './commands/completion';
+import { handleLogs, handlePs, handleServer, handleStop } from './commands/server';
 
 let gatewayManager: GatewayManager | null = null;
 let clawHubService: ClawHubService | null = null;
@@ -50,6 +51,7 @@ interface CommandRoute {
 export async function runCli(rawArgs: string[]): Promise<number> {
   // Resolve and normalize arguments
   const args = resolveCliArgs(rawArgs);
+  logger.init();
 
   // Read environment variables for defaults
   const envDefaults = {
@@ -102,6 +104,10 @@ export async function runCli(rawArgs: string[]): Promise<number> {
 
   // Command routing table
   const routes: Record<string, CommandRoute> = {
+    server: { handler: handleServer, deps: [getGatewayManager()] },
+    ps: { handler: handlePs, deps: [getGatewayManager()] },
+    stop: { handler: handleStop, deps: [getGatewayManager()] },
+    logs: { handler: handleLogs, deps: [getGatewayManager()] },
     status: { handler: handleStatus, deps: [getGatewayManager()] },
     gateway: { handler: handleGateway, deps: [getGatewayManager()] },
     provider: { handler: handleProvider },
@@ -140,10 +146,19 @@ export async function runCli(rawArgs: string[]): Promise<number> {
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const code = error instanceof CliError ? error.code : 'CLI_ERROR';
+    const details = error instanceof CliError ? error.details : undefined;
     if (jsonOutput) {
-      printJson({ success: false, error: message });
+      printJson({
+        success: false,
+        error: {
+          code,
+          message,
+          details,
+        },
+      });
     } else {
-      process.stderr.write(`Error: ${message}\n`);
+      process.stderr.write(`Error [${code}]: ${message}\n`);
     }
     return 1;
   }

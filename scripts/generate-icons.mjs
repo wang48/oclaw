@@ -35,6 +35,9 @@ try {
   await sharp(masterPngBuffer)
     .resize(512, 512)
     .toFile(path.join(ICONS_DIR, 'icon.png'));
+  await sharp(masterPngBuffer)
+    .resize(512, 512)
+    .toFile(path.join(ICONS_DIR, 'oclaw-icon.png'));
   echo`  ✅ Created icon.png (512x512)`;
 
   // 2. Generate Windows .ico
@@ -43,6 +46,7 @@ try {
 
   if (icoBuffer) {
     fs.writeFileSync(path.join(ICONS_DIR, 'icon.ico'), icoBuffer);
+    fs.writeFileSync(path.join(ICONS_DIR, 'oclaw-icon.ico'), icoBuffer);
     echo`  ✅ Created icon.ico`;
   } else {
     echo(chalk.red`  ❌ Failed to create icon.ico`);
@@ -80,6 +84,7 @@ try {
   if (process.platform === 'darwin') {
     try {
       await $`iconutil -c icns ${iconsetDir} -o ${path.join(ICONS_DIR, 'icon.icns')}`;
+      await fs.copy(path.join(ICONS_DIR, 'icon.icns'), path.join(ICONS_DIR, 'oclaw-icon.icns'));
       echo`  ✅ Created icon.icns using iconutil`;
       // Clean up iconset directory
       await fs.remove(iconsetDir);
@@ -88,6 +93,7 @@ try {
       const icnsBuffer = png2icons.createICNS(masterPngBuffer, png2icons.BEZIER, 0);
       if (icnsBuffer) {
         fs.writeFileSync(path.join(ICONS_DIR, 'icon.icns'), icnsBuffer);
+        fs.writeFileSync(path.join(ICONS_DIR, 'oclaw-icon.icns'), icnsBuffer);
         echo`  ✅ Created icon.icns using png2icons`;
       } else {
         echo(chalk.red`  ❌ Failed to create icon.icns`);
@@ -98,6 +104,7 @@ try {
     const icnsBuffer = png2icons.createICNS(masterPngBuffer, png2icons.BEZIER, 0);
     if (icnsBuffer) {
       fs.writeFileSync(path.join(ICONS_DIR, 'icon.icns'), icnsBuffer);
+      fs.writeFileSync(path.join(ICONS_DIR, 'oclaw-icon.icns'), icnsBuffer);
       echo`  ✅ Created icon.icns using png2icons`;
     } else {
       echo(chalk.red`  ❌ Failed to create icon.icns`);

@@ -10,7 +10,7 @@ const BASH_COMPLETION = `_oclaw_completion() {
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
-  commands="status st openclaw oc gateway gw provider pv channel ch skill sk cron cr chat ct clawhub hub uv completion help"
+  commands="server srv ps stop logs status st openclaw oc gateway gw provider pv channel ch skill sk cron cr chat ct clawhub hub uv completion help"
 
   if [ $COMP_CWORD -eq 1 ]; then
     COMPREPLY=( $(compgen -W "$commands --help --version --json --verbose --quiet" -- "$cur") )
@@ -18,6 +18,9 @@ const BASH_COMPLETION = `_oclaw_completion() {
   fi
 
   case "$prev" in
+    server|srv)
+      COMPREPLY=( $(compgen -W "start status restart" -- "$cur") )
+      ;;
     gateway|gw)
       COMPREPLY=( $(compgen -W "status start stop restart health rpc" -- "$cur") )
       ;;
@@ -59,6 +62,11 @@ const ZSH_COMPLETION = `#compdef oclaw
 _oclaw() {
   local -a commands
   commands=(
+    'server:Start/restart/show OpenClaw server status'
+    'srv:Alias for server'
+    'ps:List managed OpenClaw instances'
+    'stop:Stop managed OpenClaw server instance'
+    'logs:Show OpenClaw server logs'
     'status:Show runtime summary'
     'st:Alias for status'
     'gateway:Gateway status and controls'
@@ -97,6 +105,9 @@ _oclaw() {
       ;;
     args)
       case $words[1] in
+        server|srv)
+          _arguments '1: :(start status restart)'
+          ;;
         gateway|gw)
           _arguments '1: :(status start stop restart health rpc)'
           ;;

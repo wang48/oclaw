@@ -18,6 +18,7 @@ import type { CommandContext, CommandResult } from '../types';
 
 export async function handleStatus(ctx: CommandContext, gateway: GatewayManager): Promise<CommandResult> {
   const openclawStatus = getOpenClawStatus({ silent: true });
+  const gatewayStatus = gateway.getStatus();
   const gatewayHealth = await gateway.checkHealth().catch((error) => ({ ok: false, error: String(error) }));
   const providers = await getAllProvidersWithKeyInfo();
   const defaultProvider = await getDefaultProvider();
@@ -35,6 +36,15 @@ export async function handleStatus(ctx: CommandContext, gateway: GatewayManager)
       skillsDir: getOpenClawSkillsDir(),
     },
     gateway: gatewayHealth,
+    instance: {
+      name: 'openclaw',
+      type: 'server',
+      status: gatewayStatus.state,
+      pid: gatewayStatus.pid ?? null,
+      port: gatewayStatus.port ?? null,
+      startedAt: gatewayStatus.connectedAt ? new Date(gatewayStatus.connectedAt).toISOString() : null,
+      runtimePath: openclawStatus.dir,
+    },
     providers: {
       total: providers.length,
       defaultProvider,
@@ -63,6 +73,7 @@ function formatStatusHuman(value: unknown): string {
       skillsDir?: string;
     };
     gateway?: { ok?: boolean; error?: string };
+    instance?: { status?: string; pid?: number | null; port?: number | null; startedAt?: string | null };
     providers?: { total?: number; defaultProvider?: string | null };
     channels?: string[];
     skills?: { configured?: number };
@@ -70,13 +81,13 @@ function formatStatusHuman(value: unknown): string {
 
   const openclawReady = Boolean(data.openclaw?.packageExists && data.openclaw?.isBuilt);
   const channelList = (data.channels || []).length > 0 ? data.channels?.join(', ') : '-';
-  const gatewayState = data.gateway?.ok ? 'connected' : 'disconnected';
+  const gatewayState = data.instance?.status || (data.gateway?.ok ? 'connected' : 'disconnected');
   const gatewayError = data.gateway?.ok ? '' : (data.gateway?.error ? ` (${data.gateway.error})` : '');
 
   const lines = [
     `App       Oclaw ${data.app?.version || '-'} (${data.app?.platform || '-'}/${data.app?.arch || '-'})`,
     `OpenClaw  ${openclawReady ? 'ready' : 'not ready'} (v${data.openclaw?.version || '-'})`,
-    `Gateway   ${gatewayState}${gatewayError}`,
+    `Gateway   ${gatewayState}${gatewayError} (pid: ${data.instance?.pid ?? '-'}, port: ${data.instance?.port ?? '-'})`,
     `Provider  ${data.providers?.total ?? 0} configured (default: ${data.providers?.defaultProvider || '-'})`,
     `Channel   ${channelList}`,
     `Skills    ${data.skills?.configured ?? 0} configured`,

@@ -97,7 +97,7 @@ import {
   shouldInvertInDark,
   shouldShowProviderModelId,
 } from '@/lib/providers';
-import oclawIcon from '@/assets/logo.svg';
+import oclawIcon from '@/assets/oclaw-logo.svg';
 
 // Use the shared provider registry for setup providers
 const providers = SETUP_PROVIDERS;

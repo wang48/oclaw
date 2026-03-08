@@ -3,6 +3,10 @@
  */
 
 const ROOT_COMMANDS = new Set([
+  'server',
+  'ps',
+  'stop',
+  'logs',
   'status',
   'openclaw',
   'gateway',
@@ -20,6 +24,7 @@ const ROOT_COMMANDS = new Set([
 ]);
 
 export const COMMAND_ALIASES: Record<string, string> = {
+  srv: 'server',
   st: 'status',
   gw: 'gateway',
   pv: 'provider',

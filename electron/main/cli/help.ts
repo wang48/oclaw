@@ -35,6 +35,54 @@ function getAliasesFor(command: string): string[] {
 }
 
 const COMMANDS: Record<string, CommandHelp> = {
+  server: {
+    name: 'server',
+    aliases: getAliasesFor('server'),
+    summary: 'Start/restart/show OpenClaw server status',
+    usage: 'oclaw server [start|status|restart] [flags]',
+    subcommands: [
+      { name: 'start', description: 'Start OpenClaw server (default action)' },
+      { name: 'status', description: 'Show current server instance status' },
+      { name: 'restart', description: 'Restart OpenClaw server' },
+    ],
+    examples: [
+      { command: 'oclaw server', description: 'Start server and print instance info' },
+      { command: 'oclaw server status', description: 'Show server status only' },
+    ],
+  },
+  ps: {
+    name: 'ps',
+    aliases: [],
+    summary: 'List managed OpenClaw instances',
+    usage: 'oclaw ps [flags]',
+    examples: [
+      { command: 'oclaw ps', description: 'Show managed instance list' },
+      { command: 'oclaw ps --json', description: 'List instances as JSON' },
+    ],
+  },
+  stop: {
+    name: 'stop',
+    aliases: [],
+    summary: 'Stop managed OpenClaw server instance',
+    usage: 'oclaw stop [flags]',
+    examples: [
+      { command: 'oclaw stop', description: 'Stop default openclaw instance' },
+    ],
+  },
+  logs: {
+    name: 'logs',
+    aliases: [],
+    summary: 'Show OpenClaw server logs',
+    usage: 'oclaw logs [--lines <n>] [--follow]',
+    flags: [
+      { name: '--lines <n>', description: 'Show last n log lines (default 200)' },
+      { name: '--follow', description: 'Follow log output continuously' },
+    ],
+    examples: [
+      { command: 'oclaw logs --lines 50', description: 'Show last 50 log lines' },
+      { command: 'oclaw logs --follow', description: 'Follow log updates' },
+    ],
+  },
   status: {
     name: 'status',
     aliases: getAliasesFor('status'),
@@ -52,7 +100,7 @@ const COMMANDS: Record<string, CommandHelp> = {
   openclaw: {
     name: 'openclaw',
     aliases: getAliasesFor('openclaw'),
-    summary: 'OpenClaw package and paths',
+    summary: 'OpenClaw package and paths (compat command)',
     usage: 'oclaw openclaw <subcommand> [flags]',
     subcommands: [
       { name: 'status', description: 'Show OpenClaw package status' },
@@ -68,7 +116,7 @@ const COMMANDS: Record<string, CommandHelp> = {
   gateway: {
     name: 'gateway',
     aliases: getAliasesFor('gateway'),
-    summary: 'Gateway status and controls',
+    summary: 'Gateway status and controls (compat command)',
     usage: 'oclaw gateway <subcommand> [flags]',
     subcommands: [
       { name: 'status', description: 'Show gateway status and health' },

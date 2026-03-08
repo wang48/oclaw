@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="src/assets/logo.svg" width="128" height="128" alt="Oclaw Logo" />
+  <img src="src/assets/oclaw-logo.svg" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
 <h1 align="center">Oclaw</h1>
@@ -178,11 +178,17 @@ oclaw --help
 # 检查应用状态
 oclaw status
 
+# Ollama 风格服务控制
+oclaw server
+oclaw ps
+oclaw logs --lines 50
+oclaw stop
+
 # 管理 AI 提供商
 oclaw provider list
 oclaw provider save '{"id":"my-openai","name":"OpenAI","type":"openai"}' --api-key sk-xxx
 
-# 控制网关
+# 兼容命令（仍支持）
 oclaw gateway status
 oclaw gateway start
 oclaw gateway stop

@@ -3,6 +3,8 @@ import { isCliInvocationArgs, resolveCliArgs, COMMAND_ALIASES } from '../../../e
 
 describe('cli args resolution', () => {
   it('recognizes direct command invocation', () => {
+    expect(resolveCliArgs(['server'])).toEqual(['server']);
+    expect(resolveCliArgs(['ps'])).toEqual(['ps']);
     expect(resolveCliArgs(['status'])).toEqual(['status']);
     expect(isCliInvocationArgs(['gateway', 'status'])).toBe(true);
   });
@@ -88,6 +90,7 @@ describe('cli args resolution', () => {
   describe('alias mapping completeness', () => {
     it('has all expected aliases defined', () => {
       expect(COMMAND_ALIASES).toEqual({
+        srv: 'server',
         st: 'status',
         gw: 'gateway',
         pv: 'provider',
@@ -101,3 +104,7 @@ describe('cli args resolution', () => {
     });
   });
 });
+    it('resolves srv to server', () => {
+      expect(resolveCliArgs(['srv'])).toEqual(['server']);
+      expect(resolveCliArgs(['--json', 'srv'])).toEqual(['--json', 'server']);
+    });

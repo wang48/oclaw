@@ -58,7 +58,6 @@ export async function handleGateway(ctx: CommandContext, gateway: GatewayManager
       const spinner = new Spinner();
       if (!ctx.json && !ctx.quiet) spinner.start('Stopping gateway...');
       try {
-        await gateway.start();
         await gateway.stop();
         if (!ctx.json && !ctx.quiet) spinner.succeed('Gateway stopped');
         return { data: { success: true, status: gateway.getStatus() } };

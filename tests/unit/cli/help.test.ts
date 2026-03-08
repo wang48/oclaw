@@ -7,6 +7,10 @@ describe('help system', () => {
     expect(commands.length).toBeGreaterThan(0);
 
     const commandNames = commands.map(c => c.name);
+    expect(commandNames).toContain('server');
+    expect(commandNames).toContain('ps');
+    expect(commandNames).toContain('stop');
+    expect(commandNames).toContain('logs');
     expect(commandNames).toContain('status');
     expect(commandNames).toContain('gateway');
     expect(commandNames).toContain('provider');
@@ -37,6 +41,14 @@ describe('help system', () => {
     expect(help?.subcommands?.length).toBeGreaterThan(0);
     expect(help?.subcommands?.some(s => s.name === 'status')).toBe(true);
     expect(help?.aliases).toContain('gw');
+  });
+
+  it('returns help for server command', () => {
+    const help = getCommandHelp('server');
+    expect(help).toBeDefined();
+    expect(help?.name).toBe('server');
+    expect(help?.subcommands?.some(s => s.name === 'start')).toBe(true);
+    expect(help?.subcommands?.some(s => s.name === 'status')).toBe(true);
   });
 
   it('returns help for provider command', () => {

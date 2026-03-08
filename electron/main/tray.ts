@@ -27,7 +27,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
 
   if (process.platform === 'win32') {
     // Windows: use .ico for best quality in system tray
-    iconPath = join(iconsDir, 'icon.ico');
+    iconPath = join(iconsDir, 'oclaw-icon.ico');
   } else if (process.platform === 'darwin') {
     // macOS: use Template.png for proper status bar icon
     // The "Template" suffix tells macOS to treat it as a template image
@@ -41,7 +41,10 @@ export function createTray(mainWindow: BrowserWindow): Tray {
 
   // Fallback to icon.png if platform-specific icon not found
   if (icon.isEmpty()) {
-    icon = nativeImage.createFromPath(join(iconsDir, 'icon.png'));
+    icon = nativeImage.createFromPath(join(iconsDir, 'oclaw-icon.png'));
+    if (icon.isEmpty()) {
+      icon = nativeImage.createFromPath(join(iconsDir, 'icon.png'));
+    }
     // Still try to set as template for macOS
     if (process.platform === 'darwin') {
       icon.setTemplateImage(true);

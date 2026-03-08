@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="src/assets/logo.svg" width="128" height="128" alt="Oclaw Logo" />
+  <img src="src/assets/oclaw-logo.svg" width="128" height="128" alt="Oclaw Logo" />
 </p>
 
 <h1 align="center">Oclaw</h1>
@@ -178,11 +178,17 @@ oclaw --help
 # Check application status
 oclaw status
 
+# Ollama-style server control
+oclaw server
+oclaw ps
+oclaw logs --lines 50
+oclaw stop
+
 # Manage AI providers
 oclaw provider list
 oclaw provider save '{"id":"my-openai","name":"OpenAI","type":"openai"}' --api-key sk-xxx
 
-# Control gateway
+# Compatibility commands (still supported)
 oclaw gateway status
 oclaw gateway start
 oclaw gateway stop

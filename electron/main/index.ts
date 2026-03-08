@@ -75,11 +75,19 @@ function getAppIcon(): Electron.NativeImage | undefined {
   if (process.platform === 'darwin') return undefined; // macOS uses the app bundle icon
 
   const iconsDir = getIconsDir();
-  const iconPath =
+  const preferredIconPath =
     process.platform === 'win32'
-      ? join(iconsDir, 'icon.ico')
-      : join(iconsDir, 'icon.png');
-  const icon = nativeImage.createFromPath(iconPath);
+      ? join(iconsDir, 'oclaw-icon.ico')
+      : join(iconsDir, 'oclaw-icon.png');
+
+  let icon = nativeImage.createFromPath(preferredIconPath);
+  if (icon.isEmpty()) {
+    const fallbackPath =
+      process.platform === 'win32'
+        ? join(iconsDir, 'icon.ico')
+        : join(iconsDir, 'icon.png');
+    icon = nativeImage.createFromPath(fallbackPath);
+  }
   return icon.isEmpty() ? undefined : icon;
 }
 

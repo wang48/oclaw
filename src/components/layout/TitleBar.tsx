@@ -5,7 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 import { Minus, Square, X, Copy } from 'lucide-react';
-import logoSvg from '@/assets/logo.svg';
+import logoSvg from '@/assets/oclaw-logo.svg';
 
 const isMac = window.electron?.platform === 'darwin';
 
