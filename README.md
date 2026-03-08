@@ -46,18 +46,20 @@ Oclaw extends ClawX with the following enhancements:
 - Optimized macOS app icon sizing for better system integration
 - Enhanced UI consistency across all platforms
 
-### 🛠️ **Dual CLI System**
-Two independent command-line interfaces for different purposes:
+### 🛠️ **Simplified Oclaw CLI**
+Oclaw now exposes a simplified application-first CLI for the embedded OpenClaw runtime:
 
-**`oclaw`** - Application Control CLI
+**`oclaw`** - Embedded OpenClaw control CLI
 ```bash
 oclaw status              # Check app status
-oclaw provider list       # Manage AI providers
-oclaw gateway start       # Control gateway
-oclaw skill status        # View skill status
+oclaw start               # Start embedded OpenClaw
+oclaw web                 # Open the Dashboard
+oclaw provider list       # Manage model providers
+oclaw channel list        # Manage channels
+oclaw skill list          # Manage skills
 ```
 
-**`openclaw`** - OpenClaw Platform CLI
+**`openclaw`** - Full upstream OpenClaw CLI
 ```bash
 openclaw gateway start    # Start gateway service
 openclaw channels login   # Configure channels
@@ -81,7 +83,7 @@ All features from ClawX, plus:
 
 ### ✨ Unique to Oclaw
 
-- **Dual CLI Interface**: Separate commands for app control and OpenClaw platform operations
+- **Simplified Oclaw CLI**: Direct commands for runtime, dashboard, providers, channels, and skills
 - **Refined Icons**: Modern rounded-corner design across all platforms
 - **Enhanced Branding**: Consistent Oclaw branding throughout the application
 - **Optimized Build**: Improved packaging and distribution process
@@ -181,24 +183,29 @@ oclaw --help
 # Check application status
 oclaw status
 
-# Ollama-style server control
-oclaw server
-oclaw ps
+# Primary flow
+oclaw start
+oclaw web
+oclaw runtime status
 oclaw logs --lines 50
 oclaw stop
 
 # Manage AI providers
 oclaw provider list
-oclaw provider save '{"id":"my-openai","name":"OpenAI","type":"openai"}' --api-key sk-xxx
+oclaw provider add '{"id":"my-openai","name":"OpenAI","type":"openai"}' --api-key sk-xxx
 
-# Compatibility commands (still supported)
-oclaw gateway status
-oclaw gateway start
-oclaw gateway stop
+# Manage channels
+oclaw channel list
+oclaw channel add telegram '{"botToken":"..."}'
 
 # Manage skills
-oclaw skill status
+oclaw skill list
 oclaw skill enable web-search
+
+# Compatibility commands (still supported)
+oclaw server
+oclaw gateway status
+oclaw openclaw status
 
 # Manage cron jobs
 oclaw cron list
@@ -313,7 +320,7 @@ We periodically merge upstream changes from ClawX to stay current with the lates
 ### When to Use Oclaw vs ClawX
 
 **Use Oclaw if you want:**
-- Dual CLI system for both app control and OpenClaw operations
+- A simplified Oclaw CLI for runtime, dashboard, provider, channel, and skill management
 - Refined visual design with rounded icons
 - Enhanced Chinese localization
 - Specific customizations and optimizations

@@ -10,7 +10,7 @@ const BASH_COMPLETION = `_oclaw_completion() {
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
-  commands="server srv ps stop logs status st openclaw oc gateway gw provider pv channel ch skill sk cron cr chat ct clawhub hub uv completion help"
+  commands="start stop restart logs status st web repair fix runtime rt provider pv channel ch skill sk server srv ps openclaw oc gateway gw cron cr chat ct clawhub hub uv completion help"
 
   if [ $COMP_CWORD -eq 1 ]; then
     COMPREPLY=( $(compgen -W "$commands --help --version --json --verbose --quiet" -- "$cur") )
@@ -18,20 +18,26 @@ const BASH_COMPLETION = `_oclaw_completion() {
   fi
 
   case "$prev" in
+    web)
+      COMPREPLY=( $(compgen -W "dashboard control" -- "$cur") )
+      ;;
+    runtime|rt|openclaw|oc)
+      COMPREPLY=( $(compgen -W "status repair version paths logs exec" -- "$cur") )
+      ;;
+    provider|pv)
+      COMPREPLY=( $(compgen -W "list get add update remove set-key remove-key has-key get-key default current save delete delete-key set-default get-default" -- "$cur") )
+      ;;
+    channel|ch)
+      COMPREPLY=( $(compgen -W "list get add update remove enable disable validate get-form save delete validate-credentials" -- "$cur") )
+      ;;
+    skill|sk)
+      COMPREPLY=( $(compgen -W "list status enable disable config set list-config get-config update-config" -- "$cur") )
+      ;;
     server|srv)
       COMPREPLY=( $(compgen -W "start status restart" -- "$cur") )
       ;;
     gateway|gw)
       COMPREPLY=( $(compgen -W "status start stop restart health rpc" -- "$cur") )
-      ;;
-    provider|pv)
-      COMPREPLY=( $(compgen -W "list get save update delete set-key delete-key has-key get-key set-default get-default" -- "$cur") )
-      ;;
-    channel|ch)
-      COMPREPLY=( $(compgen -W "list get get-form save delete enable disable validate validate-credentials" -- "$cur") )
-      ;;
-    skill|sk)
-      COMPREPLY=( $(compgen -W "status enable disable list-config get-config update-config" -- "$cur") )
       ;;
     cron|cr)
       COMPREPLY=( $(compgen -W "list create update delete toggle trigger" -- "$cur") )
@@ -41,9 +47,6 @@ const BASH_COMPLETION = `_oclaw_completion() {
       ;;
     clawhub|hub)
       COMPREPLY=( $(compgen -W "search explore install uninstall list" -- "$cur") )
-      ;;
-    openclaw|oc)
-      COMPREPLY=( $(compgen -W "status paths cli-command install-cli-mac" -- "$cur") )
       ;;
     uv)
       COMPREPLY=( $(compgen -W "check install-all" -- "$cur") )
@@ -62,41 +65,48 @@ const ZSH_COMPLETION = `#compdef oclaw
 _oclaw() {
   local -a commands
   commands=(
-    'server:Start/restart/show OpenClaw server status'
-    'srv:Alias for server'
-    'ps:List managed OpenClaw instances'
-    'stop:Stop managed OpenClaw server instance'
-    'logs:Show OpenClaw server logs'
+    'start:Start the embedded OpenClaw service'
+    'stop:Stop the embedded OpenClaw service'
+    'restart:Restart the embedded OpenClaw service'
+    'logs:Show OpenClaw service logs'
     'status:Show runtime summary'
     'st:Alias for status'
-    'gateway:Gateway status and controls'
-    'gw:Alias for gateway'
-    'provider:Manage AI providers'
+    'web:Open the Dashboard or control UI'
+    'repair:Repair the embedded OpenClaw runtime'
+    'fix:Alias for repair'
+    'runtime:Operate the embedded OpenClaw runtime directly'
+    'rt:Alias for runtime'
+    'provider:Manage model providers'
     'pv:Alias for provider'
-    'channel:Manage channel configs'
+    'channel:Manage channel configuration'
     'ch:Alias for channel'
-    'skill:Manage skill settings'
+    'skill:Manage installed skills and config'
     'sk:Alias for skill'
+    'server:Compatibility entry for start/status/restart'
+    'srv:Alias for server'
+    'ps:Compatibility instance listing'
+    'gateway:Legacy gateway controls'
+    'gw:Alias for gateway'
+    'openclaw:Compatibility runtime entry'
+    'oc:Alias for openclaw'
     'cron:Manage scheduled jobs'
     'cr:Alias for cron'
     'chat:Chat sessions and messages'
     'ct:Alias for chat'
-    'clawhub:Explore and install skills'
+    'clawhub:Legacy skill marketplace commands'
     'hub:Alias for clawhub'
-    'openclaw:OpenClaw package and paths'
-    'oc:Alias for openclaw'
     'uv:Check/install uv and Python'
     'completion:Generate shell completion scripts'
     'help:Show help'
   )
 
-  _arguments -C \\
-    '(--help -h)'{--help,-h}'[Show help]' \\
-    '(--version -v)'{--version,-v}'[Show version]' \\
-    '--json[Output as JSON]' \\
-    '--verbose[Show debug logs]' \\
-    '--quiet[Minimal output]' \\
-    '1: :->command' \\
+  _arguments -C \
+    '(--help -h)'{--help,-h}'[Show help]' \
+    '(--version -v)'{--version,-v}'[Show version]' \
+    '--json[Output as JSON]' \
+    '--verbose[Show debug logs]' \
+    '--quiet[Minimal output]' \
+    '1: :->command' \
     '*::arg:->args'
 
   case $state in
@@ -105,20 +115,26 @@ _oclaw() {
       ;;
     args)
       case $words[1] in
+        web)
+          _arguments '1: :(dashboard control)'
+          ;;
+        runtime|rt|openclaw|oc)
+          _arguments '1: :(status repair version paths logs exec)'
+          ;;
+        provider|pv)
+          _arguments '1: :(list get add update remove set-key remove-key has-key get-key default current save delete delete-key set-default get-default)'
+          ;;
+        channel|ch)
+          _arguments '1: :(list get add update remove enable disable validate get-form save delete validate-credentials)'
+          ;;
+        skill|sk)
+          _arguments '1: :(list status enable disable config set list-config get-config update-config)'
+          ;;
         server|srv)
           _arguments '1: :(start status restart)'
           ;;
         gateway|gw)
           _arguments '1: :(status start stop restart health rpc)'
-          ;;
-        provider|pv)
-          _arguments '1: :(list get save update delete set-key delete-key has-key get-key set-default get-default)'
-          ;;
-        channel|ch)
-          _arguments '1: :(list get get-form save delete enable disable validate validate-credentials)'
-          ;;
-        skill|sk)
-          _arguments '1: :(status enable disable list-config get-config update-config)'
           ;;
         cron|cr)
           _arguments '1: :(list create update delete toggle trigger)'
@@ -128,9 +144,6 @@ _oclaw() {
           ;;
         clawhub|hub)
           _arguments '1: :(search explore install uninstall list)'
-          ;;
-        openclaw|oc)
-          _arguments '1: :(status paths cli-command install-cli-mac)'
           ;;
         uv)
           _arguments '1: :(check install-all)'

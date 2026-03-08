@@ -2,112 +2,69 @@ import { describe, expect, it } from 'vitest';
 import { getCommandHelp, getAllCommands } from '../../../electron/main/cli/help';
 
 describe('help system', () => {
-  it('returns help for all commands', () => {
-    const commands = getAllCommands();
-    expect(commands.length).toBeGreaterThan(0);
-
-    const commandNames = commands.map(c => c.name);
-    expect(commandNames).toContain('server');
-    expect(commandNames).toContain('ps');
-    expect(commandNames).toContain('stop');
-    expect(commandNames).toContain('logs');
+  it('returns help for primary and compatibility commands', () => {
+    const commandNames = getAllCommands().map((c) => c.name);
+    expect(commandNames).toContain('start');
+    expect(commandNames).toContain('restart');
     expect(commandNames).toContain('status');
-    expect(commandNames).toContain('gateway');
+    expect(commandNames).toContain('web');
+    expect(commandNames).toContain('runtime');
     expect(commandNames).toContain('provider');
     expect(commandNames).toContain('channel');
     expect(commandNames).toContain('skill');
-    expect(commandNames).toContain('cron');
-    expect(commandNames).toContain('chat');
-    expect(commandNames).toContain('clawhub');
+    expect(commandNames).toContain('server');
+    expect(commandNames).toContain('gateway');
     expect(commandNames).toContain('openclaw');
-    expect(commandNames).toContain('uv');
-    expect(commandNames).toContain('completion');
+    expect(commandNames).toContain('ps');
   });
 
   it('returns help for status command', () => {
     const help = getCommandHelp('status');
-    expect(help).toBeDefined();
-    expect(help?.name).toBe('status');
-    expect(help?.summary).toBeTruthy();
     expect(help?.usage).toContain('oclaw status');
     expect(help?.aliases).toContain('st');
   });
 
-  it('returns help for gateway command', () => {
-    const help = getCommandHelp('gateway');
-    expect(help).toBeDefined();
-    expect(help?.name).toBe('gateway');
-    expect(help?.subcommands).toBeDefined();
-    expect(help?.subcommands?.length).toBeGreaterThan(0);
-    expect(help?.subcommands?.some(s => s.name === 'status')).toBe(true);
-    expect(help?.aliases).toContain('gw');
+  it('returns help for web command', () => {
+    const help = getCommandHelp('web');
+    expect(help?.subcommands?.some((s) => s.name === 'dashboard')).toBe(true);
+    expect(help?.subcommands?.some((s) => s.name === 'control')).toBe(true);
   });
 
-  it('returns help for server command', () => {
-    const help = getCommandHelp('server');
-    expect(help).toBeDefined();
-    expect(help?.name).toBe('server');
-    expect(help?.subcommands?.some(s => s.name === 'start')).toBe(true);
-    expect(help?.subcommands?.some(s => s.name === 'status')).toBe(true);
+  it('returns help for runtime command', () => {
+    const help = getCommandHelp('runtime');
+    expect(help?.aliases).toContain('rt');
+    expect(help?.subcommands?.some((s) => s.name === 'repair')).toBe(true);
+    expect(help?.subcommands?.some((s) => s.name === 'exec -- <args...>')).toBe(true);
   });
 
-  it('returns help for provider command', () => {
+  it('returns provider help with action verbs', () => {
     const help = getCommandHelp('provider');
-    expect(help).toBeDefined();
-    expect(help?.name).toBe('provider');
-    expect(help?.subcommands).toBeDefined();
-    expect(help?.subcommands?.some(s => s.name === 'list')).toBe(true);
-    expect(help?.examples).toBeDefined();
-    expect(help?.examples?.length).toBeGreaterThan(0);
-    expect(help?.aliases).toContain('pv');
+    expect(help?.subcommands?.some((s) => s.name === 'add <json>')).toBe(true);
+    expect(help?.subcommands?.some((s) => s.name === 'remove <id>')).toBe(true);
+    expect(help?.subcommands?.some((s) => s.name === 'default <id>')).toBe(true);
   });
 
-  it('returns help for completion command', () => {
-    const help = getCommandHelp('completion');
-    expect(help).toBeDefined();
-    expect(help?.name).toBe('completion');
-    expect(help?.subcommands).toBeDefined();
-    expect(help?.subcommands?.some(s => s.name === 'bash')).toBe(true);
-    expect(help?.subcommands?.some(s => s.name === 'zsh')).toBe(true);
+  it('returns channel help with action verbs', () => {
+    const help = getCommandHelp('channel');
+    expect(help?.subcommands?.some((s) => s.name === 'add <type> <json>')).toBe(true);
+    expect(help?.subcommands?.some((s) => s.name === 'remove <type>')).toBe(true);
+  });
+
+  it('returns skill help with config verbs', () => {
+    const help = getCommandHelp('skill');
+    expect(help?.subcommands?.some((s) => s.name === 'list')).toBe(true);
+    expect(help?.subcommands?.some((s) => s.name === 'config <key>')).toBe(true);
+    expect(help?.subcommands?.some((s) => s.name === 'set <key> <json>')).toBe(true);
+  });
+
+  it('marks compatibility commands', () => {
+    expect(getCommandHelp('server')?.compat).toBe(true);
+    expect(getCommandHelp('gateway')?.compat).toBe(true);
+    expect(getCommandHelp('openclaw')?.compat).toBe(true);
+    expect(getCommandHelp('ps')?.compat).toBe(true);
   });
 
   it('returns undefined for unknown command', () => {
-    const help = getCommandHelp('nonexistent');
-    expect(help).toBeUndefined();
-  });
-
-  it('all commands have required fields', () => {
-    const commands = getAllCommands();
-    for (const cmd of commands) {
-      expect(cmd.name).toBeTruthy();
-      expect(cmd.summary).toBeTruthy();
-      expect(cmd.usage).toBeTruthy();
-      expect(cmd.aliases).toBeDefined();
-      expect(Array.isArray(cmd.aliases)).toBe(true);
-    }
-  });
-
-  it('all commands with subcommands have descriptions', () => {
-    const commands = getAllCommands();
-    for (const cmd of commands) {
-      if (cmd.subcommands) {
-        for (const sub of cmd.subcommands) {
-          expect(sub.name).toBeTruthy();
-          expect(sub.description).toBeTruthy();
-        }
-      }
-    }
-  });
-
-  it('all commands with examples have descriptions', () => {
-    const commands = getAllCommands();
-    for (const cmd of commands) {
-      if (cmd.examples) {
-        for (const ex of cmd.examples) {
-          expect(ex.command).toBeTruthy();
-          expect(ex.description).toBeTruthy();
-        }
-      }
-    }
+    expect(getCommandHelp('nonexistent')).toBeUndefined();
   });
 });

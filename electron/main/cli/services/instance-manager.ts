@@ -1,8 +1,9 @@
 import { spawnSync } from 'child_process';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat } from 'fs/promises';
 import { existsSync } from 'fs';
-import { dirname, join, resolve } from 'path';
+import { delimiter, dirname, join, resolve } from 'path';
 import { tmpdir } from 'os';
+import { utilityProcess } from 'electron';
 import { GatewayManager } from '../../../gateway/manager';
 import { logger } from '../../../utils/logger';
 import {
@@ -10,31 +11,18 @@ import {
   getOpenClawStatus,
   getOpenClawEntryPath,
 } from '../../../utils/paths';
-import { CliError } from '../types';
+import { CliError, type InstanceState, type RuntimeState, type WebOpenResult } from '../types';
 
-const DEFAULT_INSTANCE_NAME = 'openclaw';
-const DEFAULT_INSTANCE_TYPE = 'server';
-
-export interface RuntimeState {
-  ready: boolean;
-  runtimePath: string;
-  repaired: boolean;
-  source?: string;
-}
-
-export interface InstanceState {
-  name: string;
-  type: string;
-  status: string;
-  pid: number | null;
-  port: number | null;
-  startedAt: string | null;
-  runtimePath: string;
-}
+const DEFAULT_INSTANCE_NAME: InstanceState['name'] = 'openclaw';
+const DEFAULT_INSTANCE_TYPE: InstanceState['type'] = 'server';
 
 export interface LogsOptions {
   lines?: number;
   follow?: boolean;
+}
+
+export interface ExecOptions {
+  inheritStdio?: boolean;
 }
 
 function isOpenClawRuntimeBuilt(runtimeDir: string): boolean {
@@ -196,6 +184,43 @@ export class OpenClawInstanceManager {
     );
   }
 
+  getRuntimeInfo(): RuntimeState {
+    const runtimeStatus = getOpenClawStatus();
+    return {
+      ready: runtimeStatus.packageExists && runtimeStatus.isBuilt && isOpenClawRuntimeBuilt(this.runtimePath),
+      runtimePath: this.runtimePath,
+      repaired: false,
+    };
+  }
+
+  getPackageStatus() {
+    return getOpenClawStatus();
+  }
+
+  async getVersion(): Promise<string | null> {
+    const status = getOpenClawStatus();
+    return status.version ?? null;
+  }
+
+  async openDashboard(): Promise<WebOpenResult> {
+    return {
+      success: true,
+      target: 'dashboard',
+      appStarted: true,
+      url: null,
+    };
+  }
+
+  async openControlUi(): Promise<WebOpenResult> {
+    const instance = await this.start();
+    return {
+      success: true,
+      target: 'control',
+      appStarted: instance.status !== 'stopped',
+      url: `http://127.0.0.1:${instance.port ?? 18789}/`,
+    };
+  }
+
   async start(): Promise<InstanceState> {
     await this.ensureRuntime();
     try {
@@ -250,11 +275,70 @@ export class OpenClawInstanceManager {
     return logger.readLogFile(lines);
   }
 
+  async execEmbeddedOpenClaw(args: string[], options: ExecOptions = {}): Promise<number> {
+    await this.ensureRuntime();
+    const openclawDir = this.runtimePath;
+    const entryScript = getOpenClawEntryPath();
+    if (!existsSync(entryScript)) {
+      throw new CliError('RUNTIME_MISSING', `OpenClaw entry script not found at ${entryScript}`);
+    }
+
+    const platform = process.platform;
+    const arch = process.arch;
+    const target = `${platform}-${arch}`;
+    const binPath = process.env.OCLAW_FORCE_BIN_PATH || (
+      process.resourcesPath
+        ? join(process.resourcesPath, 'bin')
+        : join(process.cwd(), 'resources', 'bin', target)
+    );
+    const binPathExists = existsSync(binPath);
+    const finalPath = binPathExists
+      ? `${binPath}${delimiter}${process.env.PATH || ''}`
+      : process.env.PATH || '';
+
+    logger.info(
+      `Executing embedded OpenClaw CLI (entry="${entryScript}", args="${args.join(' ')}", cwd="${openclawDir}", bundledBin=${binPathExists ? 'yes' : 'no'})`
+    );
+
+    return await new Promise<number>((resolveExec, rejectExec) => {
+      const child = utilityProcess.fork(entryScript, args, {
+        cwd: openclawDir,
+        stdio: 'pipe',
+        env: {
+          ...process.env,
+          PATH: finalPath,
+          OPENCLAW_NO_RESPAWN: '1',
+        } as NodeJS.ProcessEnv,
+        serviceName: 'Embedded OpenClaw CLI',
+      });
+
+      child.on('error', (error) => {
+        rejectExec(new CliError('OPENCLAW_EXEC_FAILED', `Failed to execute embedded OpenClaw: ${String(error)}`));
+      });
+
+      child.stdout?.on('data', (data) => {
+        if (options.inheritStdio !== false) {
+          process.stdout.write(data);
+        }
+      });
+
+      child.stderr?.on('data', (data) => {
+        if (options.inheritStdio !== false) {
+          process.stderr.write(data);
+        }
+      });
+
+      child.on('exit', (code) => {
+        resolveExec(code ?? 0);
+      });
+    });
+  }
+
   private toInstanceState(gatewayStatus: ReturnType<GatewayManager['getStatus']>): InstanceState {
     return {
       name: DEFAULT_INSTANCE_NAME,
       type: DEFAULT_INSTANCE_TYPE,
-      status: gatewayStatus.state,
+      status: gatewayStatus.state as InstanceState['status'],
       pid: gatewayStatus.pid ?? null,
       port: gatewayStatus.port ?? null,
       startedAt: gatewayStatus.connectedAt ? new Date(gatewayStatus.connectedAt).toISOString() : null,

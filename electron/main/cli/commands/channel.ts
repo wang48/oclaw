@@ -34,17 +34,20 @@ export async function handleChannel(ctx: CommandContext): Promise<CommandResult>
       if (!rest[0]) throw new Error('Usage: channel get-form <channelType>');
       return { data: getChannelFormValues(rest[0]) };
     }
+    case 'add':
+    case 'update':
     case 'save': {
       if (!rest[0] || !rest[1]) {
-        throw new Error('Usage: channel save <channelType> <configJson>');
+        throw new Error('Usage: channel add <channelType> <configJson>');
       }
       const channelType = rest[0];
       const config = parseJsonObject(rest[1], 'channel config');
       saveChannelConfig(channelType, config);
       return { data: { success: true, channelType } };
     }
+    case 'remove':
     case 'delete': {
-      if (!rest[0]) throw new Error('Usage: channel delete <channelType>');
+      if (!rest[0]) throw new Error('Usage: channel remove <channelType>');
       deleteChannelConfig(rest[0]);
       return { data: { success: true, channelType: rest[0] } };
     }
@@ -72,6 +75,6 @@ export async function handleChannel(ctx: CommandContext): Promise<CommandResult>
       return { data: validateChannelCredentials(channelType, credentials) };
     }
     default:
-      throw new Error('Usage: channel <list|get|get-form|save|delete|enable|disable|validate|validate-credentials>');
+      throw new Error('Usage: channel <list|get|add|update|remove|enable|disable|validate|validate-credentials>');
   }
 }

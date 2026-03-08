@@ -70,8 +70,9 @@ export async function handleProvider(ctx: CommandContext): Promise<CommandResult
       if (!positional[0]) throw new Error('Usage: provider get <providerId>');
       return { data: await getProvider(positional[0]) };
     }
+    case 'add':
     case 'save': {
-      if (!positional[0]) throw new Error('Usage: provider save <configJson> [--api-key <key>]');
+      if (!positional[0]) throw new Error('Usage: provider add <configJson> [--api-key <key>]');
       const raw = parseJsonObject(positional[0], 'provider config');
       const config = toProviderConfig(raw);
       await saveProvider(config);
@@ -112,8 +113,9 @@ export async function handleProvider(ctx: CommandContext): Promise<CommandResult
 
       return { data: { success: true, providerId } };
     }
+    case 'remove':
     case 'delete': {
-      if (!positional[0]) throw new Error('Usage: provider delete <providerId>');
+      if (!positional[0]) throw new Error('Usage: provider remove <providerId>');
       const providerId = positional[0];
       const existing = await getProvider(providerId);
       await deleteProvider(providerId);
@@ -133,8 +135,9 @@ export async function handleProvider(ctx: CommandContext): Promise<CommandResult
       saveProviderKeyToOpenClaw(provider?.type || providerId, apiKey);
       return { data: { success: true, providerId } };
     }
+    case 'remove-key':
     case 'delete-key': {
-      if (!positional[0]) throw new Error('Usage: provider delete-key <providerId>');
+      if (!positional[0]) throw new Error('Usage: provider remove-key <providerId>');
       const providerId = positional[0];
       await deleteApiKey(providerId);
       const provider = await getProvider(providerId);
@@ -149,8 +152,9 @@ export async function handleProvider(ctx: CommandContext): Promise<CommandResult
       if (!positional[0]) throw new Error('Usage: provider get-key <providerId>');
       return { data: { providerId: positional[0], apiKey: await getApiKey(positional[0]) } };
     }
+    case 'default':
     case 'set-default': {
-      if (!positional[0]) throw new Error('Usage: provider set-default <providerId>');
+      if (!positional[0]) throw new Error('Usage: provider default <providerId>');
       const providerId = positional[0];
       await setDefaultProvider(providerId);
 
@@ -177,10 +181,11 @@ export async function handleProvider(ctx: CommandContext): Promise<CommandResult
 
       return { data: { success: true, providerId } };
     }
+    case 'current':
     case 'get-default':
       return { data: { defaultProviderId: await getDefaultProvider() } };
     default:
-      throw new Error('Usage: provider <list|get|save|update|delete|set-key|delete-key|has-key|get-key|set-default|get-default>');
+      throw new Error('Usage: provider <list|get|add|update|remove|set-key|remove-key|has-key|get-key|default|current>');
   }
 }
 

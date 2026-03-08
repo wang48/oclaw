@@ -1,44 +1,11 @@
 /**
- * OpenClaw command handler
+ * Compatibility wrapper for the legacy `oclaw openclaw ...` command family.
+ * Prefer `oclaw runtime ...` for embedded runtime management.
  */
-import {
-  getOpenClawStatus,
-  getOpenClawDir,
-  getOpenClawConfigDir,
-  getOpenClawSkillsDir,
-  ensureDir,
-} from '../../../utils/paths';
-import { getOpenClawCliCommand, installOpenClawCli } from '../../../utils/openclaw-cli';
-import { printCommandHelp } from '../help';
+import { GatewayManager } from '../../../gateway/manager';
+import { handleRuntime } from './runtime';
 import type { CommandContext, CommandResult } from '../types';
 
-export async function handleOpenClaw(ctx: CommandContext): Promise<CommandResult> {
-  const [subcommand] = ctx.args;
-
-  if (!subcommand || subcommand === '--help' || subcommand === '-h') {
-    printCommandHelp('openclaw');
-    return { data: undefined };
-  }
-
-  switch (subcommand) {
-    case 'status':
-      return { data: getOpenClawStatus({ silent: true }) };
-    case 'paths': {
-      const skillsDir = getOpenClawSkillsDir();
-      ensureDir(skillsDir);
-      return {
-        data: {
-          dir: getOpenClawDir(),
-          configDir: getOpenClawConfigDir(),
-          skillsDir,
-        },
-      };
-    }
-    case 'cli-command':
-      return { data: { command: getOpenClawCliCommand() } };
-    case 'install-cli-mac':
-      return { data: await installOpenClawCli() };
-    default:
-      throw new Error('Usage: openclaw <status|paths|cli-command|install-cli-mac>');
-  }
+export async function handleOpenClaw(ctx: CommandContext, gateway?: GatewayManager): Promise<CommandResult> {
+  return handleRuntime(ctx, gateway);
 }

@@ -17,6 +17,7 @@ export async function handleSkill(ctx: CommandContext, gateway: GatewayManager):
   }
 
   switch (subcommand) {
+    case 'list':
     case 'status': {
       await gateway.start();
       const data = await gateway.rpc('skills.status');
@@ -37,13 +38,15 @@ export async function handleSkill(ctx: CommandContext, gateway: GatewayManager):
     }
     case 'list-config':
       return { data: getAllSkillConfigs() };
+    case 'config':
     case 'get-config': {
-      if (!rest[0]) throw new Error('Usage: skill get-config <skillKey>');
+      if (!rest[0]) throw new Error('Usage: skill config <skillKey>');
       return { data: getSkillConfig(rest[0]) };
     }
+    case 'set':
     case 'update-config': {
       if (!rest[0] || !rest[1]) {
-        throw new Error('Usage: skill update-config <skillKey> <updatesJson>');
+        throw new Error('Usage: skill set <skillKey> <updatesJson>');
       }
       const skillKey = rest[0];
       const updates = parseJsonObject(rest[1], 'skill updates');
@@ -60,7 +63,7 @@ export async function handleSkill(ctx: CommandContext, gateway: GatewayManager):
       return { data: updateSkillConfig(skillKey, { apiKey, env }) };
     }
     default:
-      throw new Error('Usage: skill <status|enable|disable|list-config|get-config|update-config>');
+      throw new Error('Usage: skill <list|status|enable|disable|config|set|list-config|get-config|update-config>');
   }
 }
 

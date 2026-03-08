@@ -46,18 +46,20 @@ Oclaw 在 ClawX 基础上增加了以下增强功能：
 - 优化 macOS 应用图标尺寸，更好地融入系统
 - 增强所有平台的 UI 一致性
 
-### 🛠️ **双 CLI 系统**
-两个独立的命令行界面，用于不同目的：
+### 🛠️ **简化后的 Oclaw CLI**
+Oclaw 现在提供一套面向内置 OpenClaw 的主 CLI：
 
-**`oclaw`** - 应用控制 CLI
+**`oclaw`** - 内置 OpenClaw 控制 CLI
 ```bash
 oclaw status              # 检查应用状态
-oclaw provider list       # 管理 AI 提供商
-oclaw gateway start       # 控制网关
-oclaw skill status        # 查看技能状态
+oclaw start               # 启动内置 OpenClaw
+oclaw web                 # 打开仪表盘
+oclaw provider list       # 管理模型提供商
+oclaw channel list        # 管理通道
+oclaw skill list          # 管理技能
 ```
 
-**`openclaw`** - OpenClaw 平台 CLI
+**`openclaw`** - 上游完整 OpenClaw CLI
 ```bash
 openclaw gateway start    # 启动网关服务
 openclaw channels login   # 配置频道
@@ -81,7 +83,7 @@ openclaw agent --message  # 与代理交互
 
 ### ✨ Oclaw 独有功能
 
-- **双 CLI 界面**：应用控制和 OpenClaw 平台操作的独立命令
+- **简化 CLI**：直接管理 runtime、仪表盘、提供商、通道和技能
 - **精致图标**：所有平台采用现代圆角设计
 - **增强品牌**：整个应用中一致的 Oclaw 品牌
 - **优化构建**：改进的打包和分发流程
@@ -181,24 +183,29 @@ oclaw --help
 # 检查应用状态
 oclaw status
 
-# Ollama 风格服务控制
-oclaw server
-oclaw ps
+# 主流程
+oclaw start
+oclaw web
+oclaw runtime status
 oclaw logs --lines 50
 oclaw stop
 
 # 管理 AI 提供商
 oclaw provider list
-oclaw provider save '{"id":"my-openai","name":"OpenAI","type":"openai"}' --api-key sk-xxx
+oclaw provider add '{"id":"my-openai","name":"OpenAI","type":"openai"}' --api-key sk-xxx
 
-# 兼容命令（仍支持）
-oclaw gateway status
-oclaw gateway start
-oclaw gateway stop
+# 管理通道
+oclaw channel list
+oclaw channel add telegram '{"botToken":"..."}'
 
 # 管理技能
-oclaw skill status
+oclaw skill list
 oclaw skill enable web-search
+
+# 兼容命令（仍支持）
+oclaw server
+oclaw gateway status
+oclaw openclaw status
 
 # 管理定时任务
 oclaw cron list
@@ -313,7 +320,7 @@ Oclaw 是 ClawX 的**分支**，具有以下关系：
 ### 何时使用 Oclaw vs ClawX
 
 **使用 Oclaw 如果您想要：**
-- 用于应用控制和 OpenClaw 操作的双 CLI 系统
+- 一套简化后的 Oclaw CLI，用于 runtime、仪表盘、提供商、通道和技能管理
 - 带圆角图标的精致视觉设计
 - 增强的中文本地化
 - 特定的定制和优化

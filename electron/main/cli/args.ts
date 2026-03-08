@@ -3,11 +3,16 @@
  */
 
 const ROOT_COMMANDS = new Set([
-  'server',
-  'ps',
+  'start',
   'stop',
+  'restart',
   'logs',
   'status',
+  'web',
+  'repair',
+  'runtime',
+  'server',
+  'ps',
   'openclaw',
   'gateway',
   'provider',
@@ -24,8 +29,10 @@ const ROOT_COMMANDS = new Set([
 ]);
 
 export const COMMAND_ALIASES: Record<string, string> = {
-  srv: 'server',
   st: 'status',
+  fix: 'repair',
+  rt: 'runtime',
+  srv: 'server',
   gw: 'gateway',
   pv: 'provider',
   ch: 'channel',

@@ -22,9 +22,11 @@ import { runCli } from './cli/index';
 import { applyProxySettings } from './proxy';
 import { getSetting } from '../utils/store';
 import { ensureBuiltinSkillsInstalled } from '../utils/skill-config';
+import { parseLaunchAction, type LaunchAction } from './launch-actions';
 
 const cliArgs = process.argv.slice(1);
 const cliMode = isCliInvocationArgs(cliArgs);
+const pendingLaunchAction = parseLaunchAction(process.argv.slice(1));
 
 // Disable GPU hardware acceleration globally for maximum stability across
 // all GPU configurations (no GPU, integrated, discrete).
@@ -62,6 +64,30 @@ if (!gotTheLock) {
 let mainWindow: BrowserWindow | null = null;
 const gatewayManager = new GatewayManager();
 const clawHubService = new ClawHubService();
+
+async function handleLaunchAction(action: LaunchAction | null | undefined): Promise<void> {
+  if (!action) return;
+
+  if (action.control) {
+    try {
+      await gatewayManager.start();
+      const token = await getSetting('gatewayToken');
+      const baseUrl = `http://127.0.0.1:18789/`;
+      const url = token
+        ? `${baseUrl}?token=${encodeURIComponent(String(token))}`
+        : baseUrl;
+      await shell.openExternal(url);
+    } catch (error) {
+      logger.warn('Failed to open OpenClaw control UI from launch action:', error);
+    }
+  }
+
+  if (action.path && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send('navigate', action.path);
+  }
+}
 
 /**
  * Resolve the icons directory path (works in both dev and packaged mode)
@@ -162,6 +188,8 @@ async function initialize(): Promise<void> {
 
   // Create system tray
   createTray(mainWindow);
+
+  await handleLaunchAction(pendingLaunchAction);
 
   // Override security headers ONLY for the OpenClaw Gateway Control UI.
   // The URL filter ensures this callback only fires for gateway requests,
@@ -265,11 +293,13 @@ async function initialize(): Promise<void> {
 
 // When a second instance is launched, focus the existing window instead.
 if (!cliMode) {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    const launchAction = parseLaunchAction(argv);
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
+      void handleLaunchAction(launchAction);
     }
   });
 

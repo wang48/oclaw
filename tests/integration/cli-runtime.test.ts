@@ -21,23 +21,30 @@ function environmentCannotRunElectron(result: ReturnType<typeof runCli>): boolea
 }
 
 describeIntegration('cli runtime integration', () => {
-  it('supports server/ps/logs/stop flow', () => {
+  it('supports start/status/logs/stop flow', () => {
     const distMain = join(process.cwd(), 'dist-electron', 'main', 'index.js');
     expect(existsSync(distMain)).toBe(true);
 
-    const startRes = runCli(['server', '--json']);
+    const startRes = runCli(['start', '--json']);
     if (environmentCannotRunElectron(startRes)) {
       return;
     }
     expect(startRes.status).toBe(0);
     expect(startRes.stdout).toContain('"success": true');
 
-    const psRes = runCli(['ps', '--json']);
-    expect(psRes.status).toBe(0);
-    expect(psRes.stdout).toContain('"name": "openclaw"');
+    const statusRes = runCli(['status', '--json']);
+    expect(statusRes.status).toBe(0);
+    expect(statusRes.stdout).toContain('"instance"');
+
+    const runtimeRes = runCli(['runtime', 'status', '--json']);
+    expect(runtimeRes.status).toBe(0);
+    expect(runtimeRes.stdout).toContain('"runtimePath"');
 
     const logsRes = runCli(['logs', '--lines', '20']);
     expect(logsRes.status).toBe(0);
+
+    const compatRes = runCli(['server', '--json']);
+    expect(compatRes.status).toBe(0);
 
     const stopRes = runCli(['stop', '--json']);
     expect(stopRes.status).toBe(0);

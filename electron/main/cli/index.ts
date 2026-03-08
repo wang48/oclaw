@@ -22,7 +22,10 @@ import { handleClawHub } from './commands/clawhub';
 import { handleOpenClaw } from './commands/openclaw';
 import { handleUv } from './commands/uv';
 import { handleCompletion } from './commands/completion';
-import { handleLogs, handlePs, handleServer, handleStop } from './commands/server';
+import { handlePs, handleServer } from './commands/server';
+import { handleLogs, handleRestart, handleStart, handleStop } from './commands/lifecycle';
+import { handleRuntime } from './commands/runtime';
+import { handleWeb } from './commands/web';
 
 let gatewayManager: GatewayManager | null = null;
 let clawHubService: ClawHubService | null = null;
@@ -104,11 +107,21 @@ export async function runCli(rawArgs: string[]): Promise<number> {
 
   // Command routing table
   const routes: Record<string, CommandRoute> = {
+    start: { handler: handleStart, deps: [getGatewayManager()] },
+    restart: { handler: handleRestart, deps: [getGatewayManager()] },
+    web: { handler: handleWeb, deps: [getGatewayManager()] },
     server: { handler: handleServer, deps: [getGatewayManager()] },
     ps: { handler: handlePs, deps: [getGatewayManager()] },
     stop: { handler: handleStop, deps: [getGatewayManager()] },
     logs: { handler: handleLogs, deps: [getGatewayManager()] },
     status: { handler: handleStatus, deps: [getGatewayManager()] },
+    repair: {
+      handler: async (ctx, gateway) => handleRuntime({
+        ...ctx,
+        args: ['repair'],
+      }, gateway as GatewayManager),
+      deps: [getGatewayManager()],
+    },
     gateway: { handler: handleGateway, deps: [getGatewayManager()] },
     provider: { handler: handleProvider },
     channel: { handler: handleChannel },
@@ -116,7 +129,8 @@ export async function runCli(rawArgs: string[]): Promise<number> {
     cron: { handler: handleCron, deps: [getGatewayManager()] },
     chat: { handler: handleChat, deps: [getGatewayManager()] },
     clawhub: { handler: handleClawHub, deps: [getClawHubService()] },
-    openclaw: { handler: handleOpenClaw },
+    runtime: { handler: handleRuntime, deps: [getGatewayManager()] },
+    openclaw: { handler: handleOpenClaw, deps: [getGatewayManager()] },
     uv: { handler: handleUv },
     completion: { handler: handleCompletion },
   };
