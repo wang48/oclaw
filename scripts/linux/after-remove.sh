@@ -19,3 +19,11 @@ if command -v gtk-update-icon-cache &> /dev/null; then
 fi
 
 echo "Oclaw has been removed."
+
+# Remove AppArmor profile
+APPARMOR_PROFILE_TARGET='/etc/apparmor.d/oclaw'
+if [ -f "$APPARMOR_PROFILE_TARGET" ]; then
+    rm -f "$APPARMOR_PROFILE_TARGET"
+fi
+
+echo "Oclaw has been removed."

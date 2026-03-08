@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  English | <a href="README.zh-CN.md">简体中文</a>
+  English | <a href="README.zh-CN.md">简体中文</a> | <a href="README.ja-JP.md">日本語</a>
 </p>
 
 ---
@@ -134,6 +134,9 @@ The **Setup Wizard** will guide you through:
 2. **AI Provider** – Enter your API keys (OpenAI, Anthropic, etc.)
 3. **Skill Bundles** – Select pre-configured skills
 4. **Verification** – Test your configuration
+
+> Note for Moonshot (Kimi): ClawX keeps Kimi web search enabled by default.  
+> When Moonshot is configured, ClawX also syncs Kimi web search to the China endpoint (`https://api.moonshot.cn/v1`) in OpenClaw config.
 
 ### Proxy Settings
 

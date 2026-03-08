@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | 简体中文
+  <a href="README.md">English</a> | 简体中文 | <a href="README.ja-JP.md">日本語</a>
 </p>
 
 ---
@@ -134,6 +134,9 @@ pnpm dev
 2. **AI 提供商** – 输入您的 API 密钥（OpenAI、Anthropic 等）
 3. **技能包** – 选择预配置的技能
 4. **验证** – 测试您的配置
+
+> Moonshot（Kimi）说明：ClawX 默认保持开启 Kimi 的 web search。  
+> 当配置 Moonshot 后，ClawX 也会将 OpenClaw 配置中的 Kimi web search 同步到中国区端点（`https://api.moonshot.cn/v1`）。
 
 ### 代理设置
 
