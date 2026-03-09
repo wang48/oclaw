@@ -53,7 +53,7 @@ Oclaw 现在提供一套面向内置 OpenClaw 的主 CLI：
 ```bash
 oclaw status              # 检查应用状态
 oclaw start               # 启动内置 OpenClaw
-oclaw web                 # 打开仪表盘
+oclaw control             # 打开 OpenClaw 控制台
 oclaw provider list       # 管理模型提供商
 oclaw channel list        # 管理通道
 oclaw skill list          # 管理技能
@@ -83,7 +83,7 @@ openclaw agent --message  # 与代理交互
 
 ### ✨ Oclaw 独有功能
 
-- **简化 CLI**：直接管理 runtime、仪表盘、提供商、通道和技能
+- **简化 CLI**：直接管理 runtime、控制台、提供商、通道和技能
 - **精致图标**：所有平台采用现代圆角设计
 - **增强品牌**：整个应用中一致的 Oclaw 品牌
 - **优化构建**：改进的打包和分发流程
@@ -185,7 +185,7 @@ oclaw status
 
 # 主流程
 oclaw start
-oclaw web
+oclaw control
 oclaw runtime status
 oclaw logs --lines 50
 oclaw stop
@@ -263,6 +263,39 @@ pnpm package:win          # 为 Windows 打包
 pnpm package:linux        # 为 Linux 打包
 ```
 
+### 开发环境 CLI 测试
+
+在开发环境里测试 CLI 行为时，不要直接用已安装的 `oclaw` 包装器，优先使用构建后的 Electron 入口。
+
+```bash
+# 1. 先构建当前前端和 Electron 输出
+pnpm run build:vite
+
+# 2. 执行开发态 CLI 命令
+node scripts/test-cli.mjs -h
+node scripts/test-cli.mjs status
+node scripts/test-cli.mjs start
+node scripts/test-cli.mjs logs --lines 20
+node scripts/test-cli.mjs control
+node scripts/test-cli.mjs stop
+
+# 3. 兼容命令检查
+node scripts/test-cli.mjs web
+node scripts/test-cli.mjs web control
+node scripts/test-cli.mjs web dashboard
+
+# 4. 集成测试
+OCLAW_RUN_CLI_INTEGRATION=1 pnpm -s test -- tests/integration/cli-runtime.test.ts
+```
+
+预期行为：
+
+- `start` 后再执行 `status`，应返回一致的 `pid`、`port` 和 `status`
+- `control` 应打开 OpenClaw Control UI
+- `web` 和 `web control` 应作为 `control` 的兼容别名工作
+- `web dashboard` 应直接报迁移提示错误
+- `status`、`logs` 和 `runtime status` 不应拉起桌面窗口
+
 ### 技术栈
 
 | 层级 | 技术 |
@@ -320,7 +353,7 @@ Oclaw 是 ClawX 的**分支**，具有以下关系：
 ### 何时使用 Oclaw vs ClawX
 
 **使用 Oclaw 如果您想要：**
-- 一套简化后的 Oclaw CLI，用于 runtime、仪表盘、提供商、通道和技能管理
+- 一套简化后的 Oclaw CLI，用于 runtime、控制台、提供商、通道和技能管理
 - 带圆角图标的精致视觉设计
 - 增强的中文本地化
 - 特定的定制和优化

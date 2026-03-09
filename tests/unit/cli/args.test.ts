@@ -6,6 +6,7 @@ describe('cli args resolution', () => {
     expect(resolveCliArgs(['start'])).toEqual(['start']);
     expect(resolveCliArgs(['restart'])).toEqual(['restart']);
     expect(resolveCliArgs(['status'])).toEqual(['status']);
+    expect(resolveCliArgs(['control'])).toEqual(['control']);
     expect(resolveCliArgs(['web'])).toEqual(['web']);
     expect(resolveCliArgs(['runtime'])).toEqual(['runtime']);
     expect(isCliInvocationArgs(['channel', 'list'])).toBe(true);

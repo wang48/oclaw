@@ -39,28 +39,28 @@ const COMMANDS: Record<string, CommandHelp> = {
   start: {
     name: 'start',
     aliases: [],
-    summary: 'Start the embedded OpenClaw service',
+    summary: 'Start Oclaw in background tray mode and ensure OpenClaw gateway is running',
     usage: 'oclaw start [flags]',
     examples: [
-      { command: 'oclaw start', description: 'Repair runtime if needed and start OpenClaw' },
+      { command: 'oclaw start', description: 'Start the background Oclaw client without opening the main window' },
     ],
   },
   stop: {
     name: 'stop',
     aliases: [],
-    summary: 'Stop the embedded OpenClaw service',
+    summary: 'Stop OpenClaw gateway and quit the background Oclaw client',
     usage: 'oclaw stop [flags]',
     examples: [
-      { command: 'oclaw stop', description: 'Stop the default openclaw instance' },
+      { command: 'oclaw stop', description: 'Stop OpenClaw and exit the background client' },
     ],
   },
   restart: {
     name: 'restart',
     aliases: [],
-    summary: 'Restart the embedded OpenClaw service',
+    summary: 'Restart the background Oclaw client and its OpenClaw gateway',
     usage: 'oclaw restart [flags]',
     examples: [
-      { command: 'oclaw restart', description: 'Restart OpenClaw and print fresh status' },
+      { command: 'oclaw restart', description: 'Restart the background client and print fresh status' },
     ],
   },
   logs: {
@@ -91,18 +91,27 @@ const COMMANDS: Record<string, CommandHelp> = {
       { command: 'oclaw st --json', description: 'Status as JSON' },
     ],
   },
+  control: {
+    name: 'control',
+    aliases: [],
+    summary: 'Open the OpenClaw control UI in your browser',
+    usage: 'oclaw control',
+    examples: [
+      { command: 'oclaw control', description: 'Ensure gateway is running and open the OpenClaw control UI' },
+    ],
+  },
   web: {
     name: 'web',
     aliases: [],
-    summary: 'Open the Oclaw desktop Dashboard or OpenClaw control UI',
-    usage: 'oclaw web [dashboard|control]',
+    compat: true,
+    summary: 'Compatibility alias for oclaw control',
+    usage: 'oclaw web [control]',
     subcommands: [
-      { name: 'dashboard', description: 'Open the Oclaw Dashboard page (default)' },
-      { name: 'control', description: 'Open the OpenClaw control UI and ensure gateway is running' },
+      { name: 'control', description: 'Equivalent to oclaw control' },
     ],
     examples: [
-      { command: 'oclaw web', description: 'Open the Dashboard' },
-      { command: 'oclaw web control', description: 'Open the OpenClaw control UI' },
+      { command: 'oclaw web', description: 'Compatibility alias for oclaw control' },
+      { command: 'oclaw web control', description: 'Compatibility alias for oclaw control' },
     ],
   },
   repair: {

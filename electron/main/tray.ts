@@ -7,6 +7,12 @@ import { join } from 'path';
 
 let tray: Tray | null = null;
 
+interface TrayOptions {
+  showWindow: () => void;
+  openControl: () => void;
+  stopAndQuit: () => void;
+}
+
 /**
  * Resolve the icons directory path (works in both dev and packaged mode)
  */
@@ -20,7 +26,7 @@ function getIconsDir(): string {
 /**
  * Create system tray icon and menu
  */
-export function createTray(mainWindow: BrowserWindow): Tray {
+export function createTray(mainWindow: BrowserWindow, options: TrayOptions): Tray {
   // Use platform-appropriate icon for system tray
   const iconsDir = getIconsDir();
   let iconPath: string;
@@ -61,8 +67,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
   
   const showWindow = () => {
     if (mainWindow.isDestroyed()) return;
-    mainWindow.show();
-    mainWindow.focus();
+    options.showWindow();
   };
 
   // Create context menu
@@ -94,7 +99,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
           label: 'Open Dashboard',
           click: () => {
             if (mainWindow.isDestroyed()) return;
-            mainWindow.show();
+            options.showWindow();
             mainWindow.webContents.send('navigate', '/');
           },
         },
@@ -102,15 +107,21 @@ export function createTray(mainWindow: BrowserWindow): Tray {
           label: 'Open Chat',
           click: () => {
             if (mainWindow.isDestroyed()) return;
-            mainWindow.show();
+            options.showWindow();
             mainWindow.webContents.send('navigate', '/chat');
+          },
+        },
+        {
+          label: 'Open Control UI',
+          click: () => {
+            options.openControl();
           },
         },
         {
           label: 'Open Settings',
           click: () => {
             if (mainWindow.isDestroyed()) return;
-            mainWindow.show();
+            options.showWindow();
             mainWindow.webContents.send('navigate', '/settings');
           },
         },
@@ -130,9 +141,18 @@ export function createTray(mainWindow: BrowserWindow): Tray {
       type: 'separator',
     },
     {
+      label: 'Stop OpenClaw',
+      click: () => {
+        options.stopAndQuit();
+      },
+    },
+    {
+      type: 'separator',
+    },
+    {
       label: 'Quit Oclaw',
       click: () => {
-        app.quit();
+        options.stopAndQuit();
       },
     },
   ]);
@@ -145,16 +165,14 @@ export function createTray(mainWindow: BrowserWindow): Tray {
     if (mainWindow.isVisible()) {
       mainWindow.hide();
     } else {
-      mainWindow.show();
-      mainWindow.focus();
+      options.showWindow();
     }
   });
   
   // Double-click to show window (Windows)
   tray.on('double-click', () => {
     if (mainWindow.isDestroyed()) return;
-    mainWindow.show();
-    mainWindow.focus();
+    options.showWindow();
   });
   
   return tray;

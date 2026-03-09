@@ -25,6 +25,15 @@ export interface RuntimeState {
 }
 
 export type InstanceStatus = 'stopped' | 'starting' | 'running' | 'error' | 'reconnecting';
+export type ClientStatus = 'starting' | 'running-hidden' | 'running-visible' | 'stopped' | 'error';
+
+export interface ClientState {
+  pid: number | null;
+  status: ClientStatus;
+  trayReady: boolean;
+  windowVisible: boolean;
+  startedAt: string | null;
+}
 
 export interface InstanceState {
   name: 'openclaw';
@@ -36,9 +45,14 @@ export interface InstanceState {
   runtimePath: string;
 }
 
+export interface ServiceStatus {
+  app: ClientState;
+  instance: InstanceState;
+}
+
 export interface WebOpenResult {
   success: boolean;
-  target: 'dashboard' | 'control';
+  target: 'control';
   appStarted: boolean;
   url?: string | null;
 }

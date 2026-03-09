@@ -25,6 +25,7 @@ import { handleCompletion } from './commands/completion';
 import { handlePs, handleServer } from './commands/server';
 import { handleLogs, handleRestart, handleStart, handleStop } from './commands/lifecycle';
 import { handleRuntime } from './commands/runtime';
+import { handleControl } from './commands/control';
 import { handleWeb } from './commands/web';
 
 let gatewayManager: GatewayManager | null = null;
@@ -32,7 +33,7 @@ let clawHubService: ClawHubService | null = null;
 
 function getGatewayManager(): GatewayManager {
   if (!gatewayManager) {
-    gatewayManager = new GatewayManager();
+    gatewayManager = new GatewayManager({ stateSource: 'cli' });
   }
   return gatewayManager;
 }
@@ -75,15 +76,6 @@ export async function runCli(rawArgs: string[]): Promise<number> {
     (arg) => arg !== '--json' && arg !== '--verbose' && arg !== '--quiet'
   );
 
-  // Hide dock on macOS in CLI mode
-  if (process.platform === 'darwin') {
-    try {
-      app.dock.hide();
-    } catch {
-      // Ignore dock hide errors in CLI mode
-    }
-  }
-
   // Handle help and version
   if (commandArgs.length === 0 || commandArgs[0] === 'help' || commandArgs[0] === '--help' || commandArgs[0] === '-h') {
     printHelp();
@@ -109,6 +101,7 @@ export async function runCli(rawArgs: string[]): Promise<number> {
   const routes: Record<string, CommandRoute> = {
     start: { handler: handleStart, deps: [getGatewayManager()] },
     restart: { handler: handleRestart, deps: [getGatewayManager()] },
+    control: { handler: handleControl, deps: [getGatewayManager()] },
     web: { handler: handleWeb, deps: [getGatewayManager()] },
     server: { handler: handleServer, deps: [getGatewayManager()] },
     ps: { handler: handlePs, deps: [getGatewayManager()] },

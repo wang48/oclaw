@@ -1,23 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CommandContext } from '../../../electron/main/cli/types';
 
-const { managerState, launchGuiActionMock } = vi.hoisted(() => ({
+const { managerState } = vi.hoisted(() => ({
   managerState: {
-    openDashboard: vi.fn(),
     openControlUi: vi.fn(),
   },
-  launchGuiActionMock: vi.fn(),
 }));
 
 vi.mock('../../../electron/main/cli/services/instance-manager', () => ({
   OpenClawInstanceManager: class {
-    openDashboard = managerState.openDashboard;
     openControlUi = managerState.openControlUi;
   },
-}));
-
-vi.mock('../../../electron/main/launch-actions', () => ({
-  launchGuiAction: launchGuiActionMock,
 }));
 
 import { handleWeb } from '../../../electron/main/cli/commands/web';
@@ -29,22 +22,22 @@ function createCtx(args: string[]): CommandContext {
 describe('web command', () => {
   beforeEach(() => {
     Object.values(managerState).forEach((fn) => fn.mockReset());
-    launchGuiActionMock.mockReset();
-    managerState.openDashboard.mockResolvedValue({ success: true, target: 'dashboard', appStarted: true, url: null });
-    managerState.openControlUi.mockResolvedValue({ success: true, target: 'control', appStarted: true, url: 'http://127.0.0.1:18789/' });
+    managerState.openControlUi.mockResolvedValue({ success: true, target: 'control', appStarted: false, url: 'http://127.0.0.1:18789/' });
   });
 
-  it('opens dashboard by default', async () => {
+  it('maps default web command to control', async () => {
     const result = await handleWeb(createCtx([]), {} as never);
-    expect(launchGuiActionMock).toHaveBeenCalledWith({ path: '/dashboard' });
-    expect(managerState.openDashboard).toHaveBeenCalledTimes(1);
-    expect(result.data).toMatchObject({ target: 'dashboard' });
+    expect(managerState.openControlUi).toHaveBeenCalledTimes(1);
+    expect(result.data).toMatchObject({ target: 'control' });
   });
 
-  it('opens control UI', async () => {
+  it('maps explicit control subcommand', async () => {
     const result = await handleWeb(createCtx(['control']), {} as never);
     expect(managerState.openControlUi).toHaveBeenCalledTimes(1);
-    expect(launchGuiActionMock).toHaveBeenCalledWith({ control: true });
     expect(result.data).toMatchObject({ target: 'control' });
+  });
+
+  it('rejects dashboard subcommand', async () => {
+    await expect(handleWeb(createCtx(['dashboard']), {} as never)).rejects.toThrow('`oclaw web dashboard` has been removed');
   });
 });

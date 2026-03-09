@@ -14,37 +14,34 @@ import {
 } from '../../../utils/secure-storage';
 import { listConfiguredChannels } from '../../../utils/channel-config';
 import { getAllSkillConfigs } from '../../../utils/skill-config';
+import { OpenClawInstanceManager } from '../services/instance-manager';
 import type { CommandContext, CommandResult } from '../types';
 
 export async function handleStatus(ctx: CommandContext, gateway: GatewayManager): Promise<CommandResult> {
-  const openclawStatus = getOpenClawStatus({ silent: true });
-  const gatewayStatus = gateway.getStatus();
-  const gatewayHealth = await gateway.checkHealth().catch((error) => ({ ok: false, error: String(error) }));
+  const openclawStatus = getOpenClawStatus();
+  const manager = new OpenClawInstanceManager(gateway);
+  const instance = await manager.status();
+  const gatewayHealth = instance.status === 'running'
+    ? { ok: true }
+    : await gateway.checkHealth().catch((error) => ({ ok: false, error: String(error) }));
   const providers = await getAllProvidersWithKeyInfo();
   const defaultProvider = await getDefaultProvider();
 
   const data = {
-    app: {
+    oclaw: {
       name: app.getName(),
       version: app.getVersion(),
       platform: process.platform,
       arch: process.arch,
     },
+    app: instance.app,
     openclaw: {
       ...openclawStatus,
       configDir: getOpenClawConfigDir(),
       skillsDir: getOpenClawSkillsDir(),
     },
     gateway: gatewayHealth,
-    instance: {
-      name: 'openclaw',
-      type: 'server',
-      status: gatewayStatus.state,
-      pid: gatewayStatus.pid ?? null,
-      port: gatewayStatus.port ?? null,
-      startedAt: gatewayStatus.connectedAt ? new Date(gatewayStatus.connectedAt).toISOString() : null,
-      runtimePath: openclawStatus.dir,
-    },
+    instance: instance.instance,
     providers: {
       total: providers.length,
       defaultProvider,
@@ -63,7 +60,8 @@ export async function handleStatus(ctx: CommandContext, gateway: GatewayManager)
 
 function formatStatusHuman(value: unknown): string {
   const data = value as {
-    app?: { name?: string; version?: string; platform?: string; arch?: string };
+    oclaw?: { name?: string; version?: string; platform?: string; arch?: string };
+    app?: { status?: string; pid?: number | null; trayReady?: boolean };
     openclaw?: {
       packageExists?: boolean;
       isBuilt?: boolean;
@@ -85,7 +83,8 @@ function formatStatusHuman(value: unknown): string {
   const gatewayError = data.gateway?.ok ? '' : (data.gateway?.error ? ` (${data.gateway.error})` : '');
 
   const lines = [
-    `App       Oclaw ${data.app?.version || '-'} (${data.app?.platform || '-'}/${data.app?.arch || '-'})`,
+    `App       Oclaw ${data.oclaw?.version || '-'} (${data.oclaw?.platform || '-'}/${data.oclaw?.arch || '-'})`,
+    `Client    ${data.app?.status || 'stopped'} (pid: ${data.app?.pid ?? '-'}, tray: ${data.app?.trayReady ? 'ready' : 'off'})`,
     `OpenClaw  ${openclawReady ? 'ready' : 'not ready'} (v${data.openclaw?.version || '-'})`,
     `Gateway   ${gatewayState}${gatewayError} (pid: ${data.instance?.pid ?? '-'}, port: ${data.instance?.port ?? '-'})`,
     `Provider  ${data.providers?.total ?? 0} configured (default: ${data.providers?.defaultProvider || '-'})`,

@@ -53,7 +53,7 @@ Oclaw now exposes a simplified application-first CLI for the embedded OpenClaw r
 ```bash
 oclaw status              # Check app status
 oclaw start               # Start embedded OpenClaw
-oclaw web                 # Open the Dashboard
+oclaw control             # Open the OpenClaw control UI
 oclaw provider list       # Manage model providers
 oclaw channel list        # Manage channels
 oclaw skill list          # Manage skills
@@ -83,7 +83,7 @@ All features from ClawX, plus:
 
 ### ✨ Unique to Oclaw
 
-- **Simplified Oclaw CLI**: Direct commands for runtime, dashboard, providers, channels, and skills
+- **Simplified Oclaw CLI**: Direct commands for runtime, control UI, providers, channels, and skills
 - **Refined Icons**: Modern rounded-corner design across all platforms
 - **Enhanced Branding**: Consistent Oclaw branding throughout the application
 - **Optimized Build**: Improved packaging and distribution process
@@ -185,7 +185,7 @@ oclaw status
 
 # Primary flow
 oclaw start
-oclaw web
+oclaw control
 oclaw runtime status
 oclaw logs --lines 50
 oclaw stop
@@ -263,6 +263,39 @@ pnpm package:win          # Package for Windows
 pnpm package:linux        # Package for Linux
 ```
 
+### Development CLI Testing
+
+When testing CLI behavior in development, use the built Electron entry instead of an installed `oclaw` wrapper.
+
+```bash
+# 1. Build the current frontend and Electron output
+pnpm run build:vite
+
+# 2. Run development CLI commands
+node scripts/test-cli.mjs -h
+node scripts/test-cli.mjs status
+node scripts/test-cli.mjs start
+node scripts/test-cli.mjs logs --lines 20
+node scripts/test-cli.mjs control
+node scripts/test-cli.mjs stop
+
+# 3. Compatibility checks
+node scripts/test-cli.mjs web
+node scripts/test-cli.mjs web control
+node scripts/test-cli.mjs web dashboard
+
+# 4. Integration test
+OCLAW_RUN_CLI_INTEGRATION=1 pnpm -s test -- tests/integration/cli-runtime.test.ts
+```
+
+Expected behavior:
+
+- `start` followed by `status` reports the same `pid`, `port`, and `status`
+- `control` opens the OpenClaw Control UI
+- `web` and `web control` behave as compatibility aliases for `control`
+- `web dashboard` fails with a migration message
+- `status`, `logs`, and `runtime status` do not create the desktop window
+
 ### Tech Stack
 
 | Layer | Technology |
@@ -320,7 +353,7 @@ We periodically merge upstream changes from ClawX to stay current with the lates
 ### When to Use Oclaw vs ClawX
 
 **Use Oclaw if you want:**
-- A simplified Oclaw CLI for runtime, dashboard, provider, channel, and skill management
+- A simplified Oclaw CLI for runtime, control UI, provider, channel, and skill management
 - Refined visual design with rounded icons
 - Enhanced Chinese localization
 - Specific customizations and optimizations

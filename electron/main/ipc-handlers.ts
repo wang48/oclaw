@@ -1219,8 +1219,8 @@ function registerGatewayHandlers(
   };
 
   // Get Gateway status
-  ipcMain.handle('gateway:status', () => {
-    return gatewayManager.getStatus();
+  ipcMain.handle('gateway:status', async () => {
+    return await gatewayManager.getPersistentStatus();
   });
 
   // Check if Gateway is connected
@@ -1422,7 +1422,7 @@ function registerGatewayHandlers(
   // Get the Control UI URL with token for embedding
   ipcMain.handle('gateway:getControlUiUrl', async () => {
     try {
-      const status = gatewayManager.getStatus();
+      const status = await gatewayManager.getPersistentStatus();
       const token = await getSetting('gatewayToken');
       const port = status.port || 18789;
       // Pass token as query param - Control UI will store it in localStorage

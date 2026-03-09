@@ -1,20 +1,36 @@
-import { spawnSync } from 'child_process';
+import { exec, spawn, spawnSync } from 'child_process';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat } from 'fs/promises';
 import { existsSync } from 'fs';
-import { delimiter, dirname, join, resolve } from 'path';
+import { dirname, join, resolve } from 'path';
 import { tmpdir } from 'os';
-import { utilityProcess } from 'electron';
+import { shell } from 'electron';
 import { GatewayManager } from '../../../gateway/manager';
 import { logger } from '../../../utils/logger';
+import { PORTS } from '../../../utils/config';
 import {
   getOpenClawDir,
-  getOpenClawStatus,
   getOpenClawEntryPath,
+  getOpenClawStatus,
 } from '../../../utils/paths';
-import { CliError, type InstanceState, type RuntimeState, type WebOpenResult } from '../types';
+import { getSetting } from '../../../utils/store';
+import { buildServiceArgs } from '../../service-flags';
+import {
+  defaultServiceState,
+  isPidRunning,
+  probeGatewayPort,
+  readServiceState,
+  updateServiceState,
+} from '../../service-state';
+import {
+  CliError,
+  type ClientState,
+  type InstanceState,
+  type RuntimeState,
+  type ServiceStatus,
+  type WebOpenResult,
+} from '../types';
 
-const DEFAULT_INSTANCE_NAME: InstanceState['name'] = 'openclaw';
-const DEFAULT_INSTANCE_TYPE: InstanceState['type'] = 'server';
+const START_TIMEOUT_MS = 60000;
 
 export interface LogsOptions {
   lines?: number;
@@ -77,14 +93,9 @@ async function copyRuntime(sourceDir: string, targetDir: string): Promise<void> 
   const src = resolve(sourceDir);
   const dst = resolve(targetDir);
   if (src === dst) return;
-
-  const parent = dirname(dst);
-  await mkdir(parent, { recursive: true });
+  await mkdir(dirname(dst), { recursive: true }).catch(() => undefined);
   await rm(dst, { recursive: true, force: true }).catch(() => undefined);
   await cp(src, dst, { recursive: true, force: true, errorOnExist: false });
-  if (!existsSync(parent)) {
-    throw new Error(`Runtime target parent missing after copy: ${parent}`);
-  }
 }
 
 async function tryRepairFromArchive(targetDir: string): Promise<string | null> {
@@ -146,6 +157,61 @@ async function* followLogFile(filePath: string): AsyncIterable<string> {
   }
 }
 
+function getSpawnTarget(): { command: string; args: string[] } {
+  if (appIsPackaged()) {
+    return { command: process.execPath, args: [] };
+  }
+  const entryArg = process.argv[1];
+  if (!entryArg) {
+    throw new Error('Unable to resolve Electron main entry');
+  }
+  return { command: process.execPath, args: [entryArg] };
+}
+
+function appIsPackaged(): boolean {
+  return !process.defaultApp && !process.argv.some((arg) => arg.includes('electron'));
+}
+
+async function waitFor(predicate: () => Promise<boolean>, timeoutMs: number, errorMessage: string): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await predicate()) return;
+    await new Promise((resolveWait) => setTimeout(resolveWait, 500));
+  }
+  throw new CliError('CLI_ERROR', errorMessage);
+}
+
+async function getPidsListeningOnPort(port: number): Promise<number[]> {
+  const command = process.platform === 'win32'
+    ? `netstat -ano | findstr :${port}`
+    : `lsof -i :${port} -sTCP:LISTEN -t`;
+
+  return await new Promise((resolvePids) => {
+    exec(command, { windowsHide: true, timeout: 5000 }, (_error, stdout) => {
+      const output = stdout.trim();
+      if (!output) {
+        resolvePids([]);
+        return;
+      }
+      if (process.platform === 'win32') {
+        const pids = output
+          .split(/\r?\n/)
+          .map((line) => line.trim().split(/\s+/))
+          .filter((parts) => parts.length >= 5 && parts[3] === 'LISTENING')
+          .map((parts) => Number(parts[4]))
+          .filter((value) => Number.isFinite(value));
+        resolvePids([...new Set(pids)]);
+        return;
+      }
+      const pids = output
+        .split(/\r?\n/)
+        .map((value) => Number(value.trim()))
+        .filter((value) => Number.isFinite(value));
+      resolvePids([...new Set(pids)]);
+    });
+  });
+}
+
 export class OpenClawInstanceManager {
   private readonly gateway: GatewayManager;
   private readonly runtimePath: string;
@@ -173,15 +239,7 @@ export class OpenClawInstanceManager {
       return { ready: true, runtimePath: this.runtimePath, repaired: true, source: dirSource };
     }
 
-    throw new CliError(
-      'RUNTIME_REPAIR_FAILED',
-      `OpenClaw runtime is missing or incomplete at ${this.runtimePath}, and automatic repair failed.`,
-      {
-        runtimePath: this.runtimePath,
-        archiveCandidates: getOfflineArchiveCandidates(),
-        directoryCandidates: getRuntimeDirectoryCandidates(),
-      },
-    );
+    throw new CliError('RUNTIME_REPAIR_FAILED', `OpenClaw runtime is missing or incomplete at ${this.runtimePath}.`);
   }
 
   getRuntimeInfo(): RuntimeState {
@@ -198,69 +256,117 @@ export class OpenClawInstanceManager {
   }
 
   async getVersion(): Promise<string | null> {
-    const status = getOpenClawStatus();
-    return status.version ?? null;
-  }
-
-  async openDashboard(): Promise<WebOpenResult> {
-    return {
-      success: true,
-      target: 'dashboard',
-      appStarted: true,
-      url: null,
-    };
+    return getOpenClawStatus().version ?? null;
   }
 
   async openControlUi(): Promise<WebOpenResult> {
-    const instance = await this.start();
+    const service = await this.start();
+    const token = await getSetting('gatewayToken');
+    const url = `http://127.0.0.1:${service.instance.port ?? PORTS.OPENCLAW_GATEWAY}/?token=${encodeURIComponent(token || '')}`;
+    await shell.openExternal(url);
     return {
       success: true,
       target: 'control',
-      appStarted: instance.status !== 'stopped',
-      url: `http://127.0.0.1:${instance.port ?? 18789}/`,
+      appStarted: service.app.status !== 'stopped',
+      url,
     };
   }
 
-  async start(): Promise<InstanceState> {
+  async start(): Promise<ServiceStatus> {
     await this.ensureRuntime();
-    try {
-      await this.gateway.start();
+    const current = await this.status();
+    if (current.app.status !== 'stopped' && current.instance.status === 'running') {
+      return current;
+    }
+
+    await this.launchBackgroundService('start-gateway');
+    await waitFor(async () => {
+      const next = await this.status();
+      return next.app.status !== 'stopped' && next.instance.status === 'running';
+    }, START_TIMEOUT_MS, 'Timed out waiting for background Oclaw service to become ready.');
+
+    return await this.status();
+  }
+
+  async stop(): Promise<ServiceStatus> {
+    const current = await this.status();
+    if (current.app.status !== 'stopped') {
+      await this.launchServiceCommand('stop-and-exit');
+      await waitFor(async () => {
+        const next = await this.status();
+        return next.app.status === 'stopped' && next.instance.status === 'stopped';
+      }, START_TIMEOUT_MS, 'Timed out waiting for background Oclaw service to stop.');
       return await this.status();
-    } catch (error) {
-      throw new CliError('GATEWAY_START_FAILED', `Failed to start OpenClaw gateway: ${String(error)}`);
     }
+
+    await this.emergencyStopGateway();
+    await updateServiceState((state) => ({
+      ...state,
+      app: { ...state.app, pid: null, state: 'stopped', trayReady: false, windowVisible: false, startedAt: null },
+      gateway: { ...state.gateway, pid: null, state: 'stopped', startedAt: null, lastError: null },
+      source: 'cli',
+    }));
+    return await this.status();
   }
 
-  async stop(): Promise<InstanceState> {
-    const current = this.gateway.getStatus();
-    if (current.state === 'stopped') {
-      return this.toInstanceState(current);
-    }
-    try {
-      await this.gateway.stop();
-      return this.toInstanceState(this.gateway.getStatus());
-    } catch (error) {
-      throw new CliError('GATEWAY_STOP_FAILED', `Failed to stop OpenClaw gateway: ${String(error)}`);
-    }
+  async restart(): Promise<ServiceStatus> {
+    await this.stop();
+    return await this.start();
   }
 
-  async restart(): Promise<InstanceState> {
-    await this.ensureRuntime();
-    try {
-      await this.gateway.restart();
-      return await this.status();
-    } catch (error) {
-      throw new CliError('GATEWAY_START_FAILED', `Failed to restart OpenClaw gateway: ${String(error)}`);
-    }
-  }
+  async status(): Promise<ServiceStatus> {
+    const raw = readServiceState();
+    const appAlive = isPidRunning(raw.app.pid);
+    const gatewayAlive = raw.gateway.pid ? isPidRunning(raw.gateway.pid) : false;
+    const gatewayHealthy = await probeGatewayPort(raw.gateway.port, 1200);
 
-  async status(): Promise<InstanceState> {
-    const gatewayStatus = this.gateway.getStatus();
-    return this.toInstanceState(gatewayStatus);
+    const app: ClientState = {
+      pid: appAlive ? raw.app.pid : null,
+      status: appAlive ? raw.app.state : 'stopped',
+      trayReady: appAlive ? raw.app.trayReady : false,
+      windowVisible: appAlive ? raw.app.windowVisible : false,
+      startedAt: appAlive ? raw.app.startedAt : null,
+    };
+
+    const instance: InstanceState = {
+      name: 'openclaw',
+      type: 'server',
+      status: gatewayHealthy
+        ? 'running'
+        : (gatewayAlive && raw.gateway.state === 'starting' ? 'starting' : (raw.gateway.state === 'reconnecting' ? 'reconnecting' : 'stopped')),
+      pid: gatewayHealthy || gatewayAlive ? raw.gateway.pid : null,
+      port: raw.gateway.port ?? PORTS.OPENCLAW_GATEWAY,
+      startedAt: gatewayHealthy || gatewayAlive ? raw.gateway.startedAt : null,
+      runtimePath: raw.gateway.runtimePath || this.runtimePath,
+    };
+
+    if (!appAlive || !gatewayHealthy) {
+      await updateServiceState((state) => ({
+        ...state,
+        app: {
+          ...state.app,
+          pid: app.pid,
+          state: app.status,
+          trayReady: app.trayReady,
+          windowVisible: app.windowVisible,
+          startedAt: app.startedAt,
+        },
+        gateway: {
+          ...state.gateway,
+          pid: instance.pid,
+          state: instance.status === 'running' ? 'running' : 'stopped',
+          startedAt: instance.startedAt,
+          runtimePath: instance.runtimePath,
+        },
+        source: state.source,
+      })).catch(() => undefined);
+    }
+
+    return { app, instance };
   }
 
   async ps(): Promise<InstanceState[]> {
-    return [await this.status()];
+    return [(await this.status()).instance];
   }
 
   async logs(options: LogsOptions): Promise<string | AsyncIterable<string>> {
@@ -277,39 +383,20 @@ export class OpenClawInstanceManager {
 
   async execEmbeddedOpenClaw(args: string[], options: ExecOptions = {}): Promise<number> {
     await this.ensureRuntime();
-    const openclawDir = this.runtimePath;
     const entryScript = getOpenClawEntryPath();
     if (!existsSync(entryScript)) {
       throw new CliError('RUNTIME_MISSING', `OpenClaw entry script not found at ${entryScript}`);
     }
-
-    const platform = process.platform;
-    const arch = process.arch;
-    const target = `${platform}-${arch}`;
-    const binPath = process.env.OCLAW_FORCE_BIN_PATH || (
-      process.resourcesPath
-        ? join(process.resourcesPath, 'bin')
-        : join(process.cwd(), 'resources', 'bin', target)
-    );
-    const binPathExists = existsSync(binPath);
-    const finalPath = binPathExists
-      ? `${binPath}${delimiter}${process.env.PATH || ''}`
-      : process.env.PATH || '';
-
-    logger.info(
-      `Executing embedded OpenClaw CLI (entry="${entryScript}", args="${args.join(' ')}", cwd="${openclawDir}", bundledBin=${binPathExists ? 'yes' : 'no'})`
-    );
-
     return await new Promise<number>((resolveExec, rejectExec) => {
-      const child = utilityProcess.fork(entryScript, args, {
-        cwd: openclawDir,
-        stdio: 'pipe',
+      const child = spawn(process.execPath, [entryScript, ...args], {
+        cwd: this.runtimePath,
         env: {
           ...process.env,
-          PATH: finalPath,
+          ELECTRON_RUN_AS_NODE: '1',
           OPENCLAW_NO_RESPAWN: '1',
         } as NodeJS.ProcessEnv,
-        serviceName: 'Embedded OpenClaw CLI',
+        windowsHide: true,
+        stdio: options.inheritStdio === false ? 'ignore' : 'pipe',
       });
 
       child.on('error', (error) => {
@@ -317,32 +404,58 @@ export class OpenClawInstanceManager {
       });
 
       child.stdout?.on('data', (data) => {
-        if (options.inheritStdio !== false) {
-          process.stdout.write(data);
-        }
+        if (options.inheritStdio !== false) process.stdout.write(data);
       });
-
       child.stderr?.on('data', (data) => {
-        if (options.inheritStdio !== false) {
-          process.stderr.write(data);
-        }
+        if (options.inheritStdio !== false) process.stderr.write(data);
       });
-
-      child.on('exit', (code) => {
-        resolveExec(code ?? 0);
-      });
+      child.on('exit', (code) => resolveExec(code ?? 0));
     });
   }
 
-  private toInstanceState(gatewayStatus: ReturnType<GatewayManager['getStatus']>): InstanceState {
-    return {
-      name: DEFAULT_INSTANCE_NAME,
-      type: DEFAULT_INSTANCE_TYPE,
-      status: gatewayStatus.state as InstanceState['status'],
-      pid: gatewayStatus.pid ?? null,
-      port: gatewayStatus.port ?? null,
-      startedAt: gatewayStatus.connectedAt ? new Date(gatewayStatus.connectedAt).toISOString() : null,
-      runtimePath: this.runtimePath,
-    };
+  private async launchBackgroundService(command: 'start-gateway'): Promise<void> {
+    await this.launchServiceCommand(command, true);
+  }
+
+  private async launchServiceCommand(command: 'start-gateway' | 'stop-and-exit', background = true): Promise<void> {
+    const target = getSpawnTarget();
+    const child = spawn(target.command, [...target.args, ...buildServiceArgs(command, background)], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+  }
+
+  private async emergencyStopGateway(): Promise<void> {
+    const state = readServiceState();
+    const pids = new Set<number>();
+    if (state.gateway.pid) pids.add(state.gateway.pid);
+    for (const pid of await getPidsListeningOnPort(state.gateway.port || PORTS.OPENCLAW_GATEWAY)) {
+      pids.add(pid);
+    }
+
+    for (const pid of pids) {
+      if (!isPidRunning(pid)) continue;
+      if (process.platform === 'win32') {
+        await new Promise<void>((resolveKill) => {
+          exec(`taskkill /F /PID ${pid} /T`, { windowsHide: true }, () => resolveKill());
+        });
+        continue;
+      }
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {
+        continue;
+      }
+      await new Promise((resolveWait) => setTimeout(resolveWait, 1000));
+      if (isPidRunning(pid)) {
+        try {
+          process.kill(pid, 'SIGKILL');
+        } catch {
+          // ignore
+        }
+      }
+    }
   }
 }

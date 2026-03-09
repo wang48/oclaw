@@ -8,6 +8,7 @@ const ROOT_COMMANDS = new Set([
   'restart',
   'logs',
   'status',
+  'control',
   'web',
   'repair',
   'runtime',

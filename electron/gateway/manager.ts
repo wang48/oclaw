@@ -14,6 +14,12 @@ import {
   isOpenClawPresent,
   appendNodeRequireToNodeOptions,
 } from '../utils/paths';
+import {
+  type GatewayRuntimeSource,
+  readGatewayRuntimeState,
+  writeGatewayRuntimeState,
+  isPidRunning,
+} from './shared-state';
 import { getAllSettings, getSetting } from '../utils/store';
 import { getApiKey, getDefaultProvider, getProvider } from '../utils/secure-storage';
 import { getProviderEnvVars, getKeyableProviderTypes } from '../utils/provider-registry';
@@ -233,10 +239,12 @@ export class GatewayManager extends EventEmitter {
   private deferredRestartPending = false;
   private restartInFlight: Promise<void> | null = null;
   private externalShutdownSupported: boolean | null = null;
+  private readonly stateSource: GatewayRuntimeSource;
 
-  constructor(config?: Partial<ReconnectConfig>) {
+  constructor(config?: Partial<ReconnectConfig> & { stateSource?: GatewayRuntimeSource }) {
     super();
     this.reconnectConfig = { ...DEFAULT_RECONNECT_CONFIG, ...config };
+    this.stateSource = config?.stateSource ?? 'gui';
     // Device identity is loaded lazily in start() — not in the constructor —
     // so that async file I/O and key generation don't block module loading.
   }
@@ -377,6 +385,44 @@ export class GatewayManager extends EventEmitter {
    */
   getStatus(): GatewayStatus {
     return { ...this.status };
+  }
+
+  async getPersistentStatus(): Promise<GatewayStatus> {
+    if (this.status.state === 'running' || this.status.state === 'starting' || this.status.state === 'reconnecting') {
+      return this.getStatus();
+    }
+
+    const persisted = readGatewayRuntimeState();
+    if (!persisted) {
+      return this.getStatus();
+    }
+
+    if (!isPidRunning(persisted.pid)) {
+      await writeGatewayRuntimeState({
+        ...persisted,
+        pid: null,
+        startedAt: persisted.startedAt ?? null,
+        state: 'stopped',
+        lastError: persisted.lastError ?? null,
+      }).catch(() => undefined);
+      return {
+        ...this.status,
+        state: 'stopped',
+        pid: undefined,
+        connectedAt: undefined,
+        error: persisted.lastError ?? undefined,
+        port: persisted.port,
+      };
+    }
+
+    return {
+      ...this.status,
+      state: persisted.state,
+      pid: persisted.pid ?? undefined,
+      port: persisted.port,
+      connectedAt: persisted.startedAt ? Date.parse(persisted.startedAt) : undefined,
+      error: persisted.lastError ?? undefined,
+    };
   }
 
   /**
@@ -1880,5 +1926,27 @@ export class GatewayManager extends EventEmitter {
       logger.debug(`Gateway state changed: ${previousState} -> ${this.status.state}`);
       this.flushDeferredRestart(`status:${previousState}->${this.status.state}`);
     }
+
+    void this.persistSharedState();
+  }
+
+  private async persistSharedState(): Promise<void> {
+    const runtimePath = getOpenClawDir();
+    const startedAt = this.status.connectedAt
+      ? new Date(this.status.connectedAt).toISOString()
+      : (this.status.state === 'running' ? new Date().toISOString() : null);
+
+    await writeGatewayRuntimeState({
+      version: 1,
+      pid: this.status.pid ?? null,
+      port: this.status.port,
+      runtimePath,
+      startedAt,
+      state: this.status.state,
+      source: this.stateSource,
+      lastError: this.status.error ?? null,
+    }).catch((error) => {
+      logger.warn('Failed to persist gateway shared state:', error);
+    });
   }
 }

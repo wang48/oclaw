@@ -2,40 +2,31 @@ import { app } from 'electron';
 import { spawn } from 'child_process';
 
 export interface LaunchAction {
-  path?: string;
   control?: boolean;
 }
 
-const OPEN_PATH_PREFIX = '--oclaw-open-path=';
 const OPEN_CONTROL_FLAG = '--oclaw-open-control';
 
 export function parseLaunchAction(argv: string[]): LaunchAction | null {
-  let path: string | undefined;
   let control = false;
 
   for (const token of argv) {
-    if (token.startsWith(OPEN_PATH_PREFIX)) {
-      path = token.slice(OPEN_PATH_PREFIX.length) || '/dashboard';
-    } else if (token === OPEN_CONTROL_FLAG) {
+    if (token === OPEN_CONTROL_FLAG) {
       control = true;
     }
   }
 
-  if (!path && !control) {
+  if (!control) {
     return null;
   }
 
   return {
-    path,
     control,
   };
 }
 
 export function buildLaunchArgs(action: LaunchAction): string[] {
   const args: string[] = [];
-  if (action.path) {
-    args.push(`${OPEN_PATH_PREFIX}${action.path}`);
-  }
   if (action.control) {
     args.push(OPEN_CONTROL_FLAG);
   }

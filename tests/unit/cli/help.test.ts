@@ -7,6 +7,7 @@ describe('help system', () => {
     expect(commandNames).toContain('start');
     expect(commandNames).toContain('restart');
     expect(commandNames).toContain('status');
+    expect(commandNames).toContain('control');
     expect(commandNames).toContain('web');
     expect(commandNames).toContain('runtime');
     expect(commandNames).toContain('provider');
@@ -24,10 +25,13 @@ describe('help system', () => {
     expect(help?.aliases).toContain('st');
   });
 
-  it('returns help for web command', () => {
-    const help = getCommandHelp('web');
-    expect(help?.subcommands?.some((s) => s.name === 'dashboard')).toBe(true);
-    expect(help?.subcommands?.some((s) => s.name === 'control')).toBe(true);
+  it('returns help for control and web compatibility command', () => {
+    const control = getCommandHelp('control');
+    expect(control?.usage).toContain('oclaw control');
+
+    const web = getCommandHelp('web');
+    expect(web?.compat).toBe(true);
+    expect(web?.subcommands?.some((s) => s.name === 'control')).toBe(true);
   });
 
   it('returns help for runtime command', () => {
@@ -58,6 +62,7 @@ describe('help system', () => {
   });
 
   it('marks compatibility commands', () => {
+    expect(getCommandHelp('web')?.compat).toBe(true);
     expect(getCommandHelp('server')?.compat).toBe(true);
     expect(getCommandHelp('gateway')?.compat).toBe(true);
     expect(getCommandHelp('openclaw')?.compat).toBe(true);

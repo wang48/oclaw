@@ -1,20 +1,22 @@
 import { GatewayManager } from '../../../gateway/manager';
 import { getOpenClawConfigDir, getOpenClawSkillsDir } from '../../../utils/paths';
+import { PORTS } from '../../../utils/config';
 import { parseArgs, parseNumber, getOptionBoolean, getOptionString } from '../parse';
 import { Spinner } from '../output';
-import type { CommandContext, CommandResult, InstanceState } from '../types';
+import type { CommandContext, CommandResult, ServiceStatus } from '../types';
 import { OpenClawInstanceManager } from '../services/instance-manager';
 
-function formatInstanceHuman(title: string, instance: InstanceState): string {
+function formatServiceHuman(title: string, service: ServiceStatus): string {
   return [
     title,
-    `status: ${instance.status}`,
-    `pid: ${instance.pid ?? '-'}`,
-    `port: ${instance.port ?? '-'}`,
-    `runtime: ${instance.runtimePath}`,
+    `client: ${service.app.status} (pid: ${service.app.pid ?? '-'})`,
+    `status: ${service.instance.status}`,
+    `pid: ${service.instance.pid ?? '-'}`,
+    `port: ${service.instance.port ?? '-'}`,
+    `runtime: ${service.instance.runtimePath}`,
     `config: ${getOpenClawConfigDir()}`,
     `skills: ${getOpenClawSkillsDir()}`,
-    'dashboard: app://dashboard',
+    `control: http://127.0.0.1:${service.instance.port ?? PORTS.OPENCLAW_GATEWAY}/`,
     '',
   ].join('\n');
 }
@@ -23,11 +25,11 @@ export async function handleStart(ctx: CommandContext, gateway: GatewayManager):
   const spinner = new Spinner();
   const manager = new OpenClawInstanceManager(gateway);
   if (!ctx.json && !ctx.quiet) spinner.start('Starting OpenClaw...');
-  const instance = await manager.start();
+  const service = await manager.start();
   if (!ctx.json && !ctx.quiet) spinner.succeed('OpenClaw started');
   return {
-    data: { success: true, instance },
-    humanFormatter: (payload) => formatInstanceHuman('OpenClaw started', (payload as { instance: InstanceState }).instance),
+    data: { success: true, ...service },
+    humanFormatter: (payload) => formatServiceHuman('OpenClaw started', payload as ServiceStatus),
   };
 }
 
@@ -35,11 +37,11 @@ export async function handleStop(ctx: CommandContext, gateway: GatewayManager): 
   const spinner = new Spinner();
   const manager = new OpenClawInstanceManager(gateway);
   if (!ctx.json && !ctx.quiet) spinner.start('Stopping OpenClaw...');
-  const instance = await manager.stop();
+  const service = await manager.stop();
   if (!ctx.json && !ctx.quiet) spinner.succeed('OpenClaw stopped');
   return {
-    data: { success: true, instance },
-    humanFormatter: (payload) => formatInstanceHuman('OpenClaw stopped', (payload as { instance: InstanceState }).instance),
+    data: { success: true, ...service },
+    humanFormatter: (payload) => formatServiceHuman('OpenClaw stopped', payload as ServiceStatus),
   };
 }
 
@@ -47,11 +49,11 @@ export async function handleRestart(ctx: CommandContext, gateway: GatewayManager
   const spinner = new Spinner();
   const manager = new OpenClawInstanceManager(gateway);
   if (!ctx.json && !ctx.quiet) spinner.start('Restarting OpenClaw...');
-  const instance = await manager.restart();
+  const service = await manager.restart();
   if (!ctx.json && !ctx.quiet) spinner.succeed('OpenClaw restarted');
   return {
-    data: { success: true, instance },
-    humanFormatter: (payload) => formatInstanceHuman('OpenClaw restarted', (payload as { instance: InstanceState }).instance),
+    data: { success: true, ...service },
+    humanFormatter: (payload) => formatServiceHuman('OpenClaw restarted', payload as ServiceStatus),
   };
 }
 

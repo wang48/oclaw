@@ -23,10 +23,27 @@ import { applyProxySettings } from './proxy';
 import { getSetting } from '../utils/store';
 import { ensureBuiltinSkillsInstalled } from '../utils/skill-config';
 import { parseLaunchAction, type LaunchAction } from './launch-actions';
+import { buildServiceArgs, parseServiceFlags, type OclawServiceCommand } from './service-flags';
+import { probeGatewayPort, updateServiceState, writeServiceState } from './service-state';
+import { PORTS } from '../utils/config';
+import { getOpenClawDir } from '../utils/paths';
 
-const cliArgs = process.argv.slice(1);
-const cliMode = isCliInvocationArgs(cliArgs);
-const pendingLaunchAction = parseLaunchAction(process.argv.slice(1));
+const rawArgs = process.argv.slice(1);
+const serviceFlags = parseServiceFlags(rawArgs);
+const backgroundServiceMode = serviceFlags.background;
+const cliMode = !backgroundServiceMode && isCliInvocationArgs(rawArgs);
+const pendingLaunchAction = backgroundServiceMode ? null : parseLaunchAction(rawArgs);
+const headlessCliMode = cliMode;
+
+if ((headlessCliMode || backgroundServiceMode) && process.platform === 'darwin') {
+  try {
+    (app as Electron.App & {
+      setActivationPolicy?: (policy: 'regular' | 'accessory' | 'prohibited') => void;
+    }).setActivationPolicy?.('accessory');
+  } catch {
+    // ignore
+  }
+}
 
 // Disable GPU hardware acceleration globally for maximum stability across
 // all GPU configurations (no GPU, integrated, discrete).
@@ -62,8 +79,9 @@ if (!gotTheLock) {
 
 // Global references
 let mainWindow: BrowserWindow | null = null;
-const gatewayManager = new GatewayManager();
+const gatewayManager = new GatewayManager({ stateSource: 'gui' });
 const clawHubService = new ClawHubService();
+let startupCompleted = false;
 
 async function handleLaunchAction(action: LaunchAction | null | undefined): Promise<void> {
   if (!action) return;
@@ -82,11 +100,32 @@ async function handleLaunchAction(action: LaunchAction | null | undefined): Prom
     }
   }
 
-  if (action.path && mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.show();
-    mainWindow.focus();
-    mainWindow.webContents.send('navigate', action.path);
+}
+
+function setAppActivation(visible: boolean): void {
+  if (process.platform !== 'darwin') return;
+  try {
+    (app as Electron.App & {
+      setActivationPolicy?: (policy: 'regular' | 'accessory' | 'prohibited') => void;
+    }).setActivationPolicy?.(visible ? 'regular' : 'accessory');
+  } catch {
+    // ignore
   }
+}
+
+async function syncAppState(state: 'starting' | 'running-hidden' | 'running-visible' | 'stopped' | 'error'): Promise<void> {
+  await updateServiceState((current) => ({
+    ...current,
+    source: backgroundServiceMode ? 'cli' : 'gui',
+    app: {
+      ...current.app,
+      pid: state === 'stopped' ? null : process.pid,
+      state,
+      trayReady: state !== 'stopped',
+      windowVisible: state === 'running-visible',
+      startedAt: state === 'stopped' ? null : (current.app.startedAt || new Date().toISOString()),
+    },
+  })).catch(() => undefined);
 }
 
 /**
@@ -119,8 +158,9 @@ function getAppIcon(): Electron.NativeImage | undefined {
 /**
  * Create the main application window
  */
-function createWindow(): BrowserWindow {
+function createWindow(options: { hidden?: boolean } = {}): BrowserWindow {
   const isMac = process.platform === 'darwin';
+  const hidden = options.hidden === true;
 
   const win = new BrowserWindow({
     width: 1280,
@@ -139,12 +179,15 @@ function createWindow(): BrowserWindow {
     trafficLightPosition: isMac ? { x: 16, y: 16 } : undefined,
     frame: isMac,
     show: false,
+    skipTaskbar: hidden,
   });
 
   // Show window when ready to prevent visual flash
-  win.once('ready-to-show', () => {
-    win.show();
-  });
+  if (!hidden) {
+    win.once('ready-to-show', () => {
+      win.show();
+    });
+  }
 
   // Handle external links
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -155,7 +198,9 @@ function createWindow(): BrowserWindow {
   // Load the app
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
-    win.webContents.openDevTools();
+    if (!hidden) {
+      win.webContents.openDevTools();
+    }
   } else {
     win.loadFile(join(__dirname, '../../dist/index.html'));
   }
@@ -163,10 +208,139 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  setAppActivation(true);
+  mainWindow.setSkipTaskbar(false);
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  void syncAppState('running-visible');
+}
+
+function hideMainWindowToTray(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.hide();
+  if (process.platform !== 'darwin') {
+    mainWindow.setSkipTaskbar(true);
+  }
+  setAppActivation(false);
+  void syncAppState('running-hidden');
+}
+
+async function openControlUi(): Promise<void> {
+  await gatewayManager.start();
+  const token = await getSetting('gatewayToken');
+  const port = gatewayManager.getStatus().port || PORTS.OPENCLAW_GATEWAY;
+  const baseUrl = `http://127.0.0.1:${port}/`;
+  const url = token
+    ? `${baseUrl}?token=${encodeURIComponent(String(token))}`
+    : baseUrl;
+  await shell.openExternal(url);
+}
+
+async function stopServiceAndQuit(): Promise<void> {
+  setQuitting();
+  try {
+    await gatewayManager.stop();
+  } catch (error) {
+    logger.warn('Failed to stop gateway during quit:', error);
+  }
+  await writeServiceState({
+    version: 1,
+    app: {
+      pid: null,
+      state: 'stopped',
+      trayReady: false,
+      windowVisible: false,
+      startedAt: null,
+    },
+    gateway: {
+      pid: null,
+      state: 'stopped',
+      port: PORTS.OPENCLAW_GATEWAY,
+      runtimePath: getOpenClawDir(),
+      startedAt: null,
+      lastError: null,
+    },
+    source: backgroundServiceMode ? 'cli' : 'gui',
+    updatedAt: new Date().toISOString(),
+  }).catch(() => undefined);
+  app.quit();
+}
+
+async function executeServiceCommand(command: OclawServiceCommand | null): Promise<void> {
+  if (!command) return;
+  switch (command) {
+    case 'start-gateway':
+      await gatewayManager.start();
+      break;
+    case 'stop-and-exit':
+      await stopServiceAndQuit();
+      break;
+    case 'show-window':
+      showMainWindow();
+      break;
+    case 'open-control':
+      await openControlUi();
+      break;
+  }
+}
+
+function registerWindowLifecycle(): void {
+  if (!mainWindow) return;
+
+  mainWindow.on('close', (event) => {
+    if (!isQuitting()) {
+      event.preventDefault();
+      hideMainWindowToTray();
+    }
+  });
+
+  mainWindow.on('show', () => {
+    if (startupCompleted) {
+      void syncAppState('running-visible');
+    }
+  });
+
+  mainWindow.on('hide', () => {
+    if (startupCompleted) {
+      void syncAppState('running-hidden');
+    }
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+function registerGatewayStateSync(): void {
+  gatewayManager.on('status', (status: { state: string; pid?: number; port?: number; connectedAt?: number; error?: string }) => {
+    void updateServiceState((current) => ({
+      ...current,
+      gateway: {
+        ...current.gateway,
+        pid: status.pid ?? current.gateway.pid ?? null,
+        state: status.state as 'starting' | 'running' | 'stopped' | 'error' | 'reconnecting',
+        port: status.port ?? current.gateway.port,
+        runtimePath: current.gateway.runtimePath,
+        startedAt: status.connectedAt ? new Date(status.connectedAt).toISOString() : (status.state === 'stopped' ? null : current.gateway.startedAt),
+        lastError: status.error ?? null,
+      },
+    })).catch(() => undefined);
+
+    if (status.state === 'running') {
+      void ensureOclawContext().catch((error) => {
+        logger.warn('Failed to re-merge Oclaw context after gateway reconnect:', error);
+      });
+    }
+  });
+}
+
 /**
  * Initialize the application
  */
-async function initialize(): Promise<void> {
+async function initialize(options: { background: boolean; ensureGateway: boolean }): Promise<void> {
   // Initialize logger first
   logger.init();
   logger.info('=== Oclaw Application Starting ===');
@@ -180,14 +354,46 @@ async function initialize(): Promise<void> {
   // Apply persisted proxy settings before creating windows or network requests.
   await applyProxySettings();
 
-  // Set application menu
-  createMenu();
+  if (!options.background) {
+    createMenu();
+  }
 
   // Create the main window
-  mainWindow = createWindow();
+  mainWindow = createWindow({ hidden: options.background });
 
   // Create system tray
-  createTray(mainWindow);
+  createTray(mainWindow, {
+    showWindow: showMainWindow,
+    openControl: () => {
+      void openControlUi();
+    },
+    stopAndQuit: () => {
+      void stopServiceAndQuit();
+    },
+  });
+  registerWindowLifecycle();
+  registerGatewayStateSync();
+
+  await writeServiceState({
+    version: 1,
+    app: {
+      pid: process.pid,
+      state: options.background ? 'starting' : 'running-visible',
+      trayReady: true,
+      windowVisible: !options.background,
+      startedAt: new Date().toISOString(),
+    },
+    gateway: {
+      pid: gatewayManager.getStatus().pid ?? null,
+      state: 'stopped',
+      port: gatewayManager.getStatus().port || PORTS.OPENCLAW_GATEWAY,
+      runtimePath: getOpenClawDir(),
+      startedAt: null,
+      lastError: null,
+    },
+    source: options.background ? 'cli' : 'gui',
+    updatedAt: new Date().toISOString(),
+  }).catch(() => undefined);
 
   await handleLaunchAction(pendingLaunchAction);
 
@@ -220,21 +426,6 @@ async function initialize(): Promise<void> {
   // Register update handlers
   registerUpdateHandlers(appUpdater, mainWindow);
 
-  // Note: Auto-check for updates is driven by the renderer (update store init)
-  // so it respects the user's "Auto-check for updates" setting.
-
-  // Minimize to tray on close instead of quitting (macOS & Windows)
-  mainWindow.on('close', (event) => {
-    if (!isQuitting()) {
-      event.preventDefault();
-      mainWindow?.hide();
-    }
-  });
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
   // Repair any bootstrap files that only contain Oclaw markers (no OpenClaw
   // template content). This fixes a race condition where ensureOclawContext()
   // previously created the file before the gateway could seed the full template.
@@ -248,8 +439,8 @@ async function initialize(): Promise<void> {
     logger.warn('Failed to install built-in skills:', error);
   });
 
-  // Start Gateway automatically (this seeds missing bootstrap files with full templates)
-  const gatewayAutoStart = await getSetting('gatewayAutoStart');
+  // Start Gateway automatically or when background service was explicitly requested.
+  const gatewayAutoStart = options.ensureGateway || await getSetting('gatewayAutoStart');
   if (gatewayAutoStart) {
     try {
       logger.debug('Auto-starting Gateway...');
@@ -280,42 +471,47 @@ async function initialize(): Promise<void> {
     logger.warn('CLI auto-install failed:', error);
   });
 
-  // Re-apply Oclaw context after every gateway restart because the gateway
-  // may re-seed workspace files with clean templates (losing Oclaw markers).
-  gatewayManager.on('status', (status: { state: string }) => {
-    if (status.state === 'running') {
-      void ensureOclawContext().catch((error) => {
-        logger.warn('Failed to re-merge Oclaw context after gateway reconnect:', error);
-      });
-    }
-  });
+  startupCompleted = true;
+  await syncAppState(options.background ? 'running-hidden' : 'running-visible');
 }
 
 // When a second instance is launched, focus the existing window instead.
 if (!cliMode) {
   app.on('second-instance', (_event, argv) => {
+    const serviceArgs = parseServiceFlags(argv);
     const launchAction = parseLaunchAction(argv);
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
+    if (serviceArgs.command) {
+      void executeServiceCommand(serviceArgs.command);
+      return;
+    }
+    if (launchAction) {
       void handleLaunchAction(launchAction);
+      return;
+    }
+    if (mainWindow) {
+      showMainWindow();
     }
   });
 
   // Application lifecycle
-  app.whenReady().then(() => {
-    initialize();
+  app.whenReady().then(async () => {
+    await initialize({
+      background: backgroundServiceMode,
+      ensureGateway: backgroundServiceMode && serviceFlags.command === 'start-gateway',
+    });
+    if (backgroundServiceMode) {
+      await executeServiceCommand(serviceFlags.command);
+    }
 
     // Register activate handler AFTER app is ready to prevent
     // "Cannot create BrowserWindow before app is ready" on macOS.
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
-        mainWindow = createWindow();
+        mainWindow = createWindow({ hidden: false });
+        registerWindowLifecycle();
       } else if (mainWindow && !mainWindow.isDestroyed()) {
         // On macOS, clicking the dock icon should show the window if it's hidden
-        mainWindow.show();
-        mainWindow.focus();
+        showMainWindow();
       }
     });
   });
@@ -328,15 +524,14 @@ if (!cliMode) {
 
   app.on('before-quit', () => {
     setQuitting();
-    // Fire-and-forget: do not await gatewayManager.stop() here.
-    // Awaiting inside before-quit can stall Electron's quit sequence.
+    void syncAppState('stopped');
     void gatewayManager.stop().catch((err) => {
       logger.warn('gatewayManager.stop() error during quit:', err);
     });
   });
 } else {
   app.whenReady().then(async () => {
-    const exitCode = await runCli(cliArgs);
+    const exitCode = await runCli(rawArgs);
     app.exit(exitCode);
   });
 }

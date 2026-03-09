@@ -10,7 +10,7 @@ const BASH_COMPLETION = `_oclaw_completion() {
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
-  commands="start stop restart logs status st web repair fix runtime rt provider pv channel ch skill sk server srv ps openclaw oc gateway gw cron cr chat ct clawhub hub uv completion help"
+  commands="start stop restart logs status st control web repair fix runtime rt provider pv channel ch skill sk server srv ps openclaw oc gateway gw cron cr chat ct clawhub hub uv completion help"
 
   if [ $COMP_CWORD -eq 1 ]; then
     COMPREPLY=( $(compgen -W "$commands --help --version --json --verbose --quiet" -- "$cur") )
@@ -19,7 +19,7 @@ const BASH_COMPLETION = `_oclaw_completion() {
 
   case "$prev" in
     web)
-      COMPREPLY=( $(compgen -W "dashboard control" -- "$cur") )
+      COMPREPLY=( $(compgen -W "control" -- "$cur") )
       ;;
     runtime|rt|openclaw|oc)
       COMPREPLY=( $(compgen -W "status repair version paths logs exec" -- "$cur") )
@@ -71,7 +71,8 @@ _oclaw() {
     'logs:Show OpenClaw service logs'
     'status:Show runtime summary'
     'st:Alias for status'
-    'web:Open the Dashboard or control UI'
+    'control:Open the OpenClaw control UI'
+    'web:Compatibility alias for control'
     'repair:Repair the embedded OpenClaw runtime'
     'fix:Alias for repair'
     'runtime:Operate the embedded OpenClaw runtime directly'
@@ -116,7 +117,7 @@ _oclaw() {
     args)
       case $words[1] in
         web)
-          _arguments '1: :(dashboard control)'
+          _arguments '1: :(control)'
           ;;
         runtime|rt|openclaw|oc)
           _arguments '1: :(status repair version paths logs exec)'
