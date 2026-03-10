@@ -89,16 +89,16 @@ export function getOpenClawCliCommand(): string {
 
 // ── Packaged CLI wrapper path ────────────────────────────────────────────────
 
-function getPackagedCliWrapperPath(): string | null {
+function getPackagedCliWrapperPath(name: 'openclaw' | 'oclaw'): string | null {
   if (!app.isPackaged) return null;
   const platform = process.platform;
 
   if (platform === 'darwin' || platform === 'linux') {
-    const wrapper = join(process.resourcesPath, 'cli', 'openclaw');
+    const wrapper = join(process.resourcesPath, 'cli', name);
     return existsSync(wrapper) ? wrapper : null;
   }
   if (platform === 'win32') {
-    const wrapper = join(process.resourcesPath, 'cli', 'openclaw.cmd');
+    const wrapper = join(process.resourcesPath, 'cli', `${name}.cmd`);
     return existsSync(wrapper) ? wrapper : null;
   }
   return null;
@@ -106,11 +106,11 @@ function getPackagedCliWrapperPath(): string | null {
 
 // ── macOS / Linux install ────────────────────────────────────────────────────
 
-function getCliTargetPath(): string {
-  return join(homedir(), '.local', 'bin', 'openclaw');
+function getCliTargetPath(name: 'openclaw' | 'oclaw'): string {
+  return join(homedir(), '.local', 'bin', name);
 }
 
-export async function installOpenClawCli(): Promise<{
+async function installCli(name: 'openclaw' | 'oclaw'): Promise<{
   success: boolean; path?: string; error?: string;
 }> {
   const platform = process.platform;
@@ -123,13 +123,13 @@ export async function installOpenClawCli(): Promise<{
     return { success: false, error: 'CLI install is only available in packaged builds.' };
   }
 
-  const wrapperSrc = getPackagedCliWrapperPath();
+  const wrapperSrc = getPackagedCliWrapperPath(name);
   if (!wrapperSrc) {
     return { success: false, error: 'CLI wrapper not found in app resources.' };
   }
 
   const targetDir = join(homedir(), '.local', 'bin');
-  const target = getCliTargetPath();
+  const target = getCliTargetPath(name);
 
   try {
     mkdirSync(targetDir, { recursive: true });
@@ -141,26 +141,38 @@ export async function installOpenClawCli(): Promise<{
 
     symlinkSync(wrapperSrc, target);
     chmodSync(wrapperSrc, 0o755);
-    logger.info(`OpenClaw CLI symlink created: ${target} -> ${wrapperSrc}`);
+    logger.info(`${name} CLI symlink created: ${target} -> ${wrapperSrc}`);
     return { success: true, path: target };
   } catch (error) {
-    logger.error('Failed to install OpenClaw CLI:', error);
+    logger.error(`Failed to install ${name} CLI:`, error);
     return { success: false, error: String(error) };
   }
 }
 
+export async function installOpenClawCli(): Promise<{
+  success: boolean; path?: string; error?: string;
+}> {
+  return installCli('openclaw');
+}
+
+export async function installOclawCli(): Promise<{
+  success: boolean; path?: string; error?: string;
+}> {
+  return installCli('oclaw');
+}
+
 // ── Auto-install on first launch ─────────────────────────────────────────────
 
-function isCliInstalled(): boolean {
+function isCliInstalled(name: 'openclaw' | 'oclaw'): boolean {
   const platform = process.platform;
 
   if (platform === 'win32') return true; // handled by NSIS installer
 
-  const target = getCliTargetPath();
+  const target = getCliTargetPath(name);
   if (!existsSync(target)) return false;
 
-  // Also check /usr/local/bin/openclaw for deb installs
-  if (platform === 'linux' && existsSync('/usr/local/bin/openclaw')) return true;
+  // Also check /usr/local/bin for deb installs
+  if (platform === 'linux' && existsSync(`/usr/local/bin/${name}`)) return true;
 
   return true;
 }
@@ -207,31 +219,38 @@ export async function autoInstallCliIfNeeded(
   if (!app.isPackaged) return;
   if (process.platform === 'win32') return; // NSIS handles it
 
-  const target = getCliTargetPath();
-  const wrapperSrc = getPackagedCliWrapperPath();
+  const targets: Array<'openclaw' | 'oclaw'> = ['openclaw', 'oclaw'];
+  let installedAny = false;
 
-  if (isCliInstalled()) {
-    if (target && wrapperSrc && existsSync(target)) {
-      try {
-        unlinkSync(target);
-        symlinkSync(wrapperSrc, target);
-        logger.debug(`Refreshed CLI symlink: ${target} -> ${wrapperSrc}`);
-      } catch {
-        // non-critical
+  for (const name of targets) {
+    const target = getCliTargetPath(name);
+    const wrapperSrc = getPackagedCliWrapperPath(name);
+
+    if (isCliInstalled(name)) {
+      if (target && wrapperSrc && existsSync(target)) {
+        try {
+          unlinkSync(target);
+          symlinkSync(wrapperSrc, target);
+          logger.debug(`Refreshed ${name} CLI symlink: ${target} -> ${wrapperSrc}`);
+        } catch {
+          // non-critical
+        }
       }
+      continue;
     }
-    return;
+
+    logger.info(`Auto-installing ${name} CLI...`);
+    const result = await installCli(name);
+    if (result.success) {
+      installedAny = true;
+      logger.info(`${name} CLI auto-installed at ${result.path}`);
+      if (result.path) notify?.(result.path);
+    } else {
+      logger.warn(`${name} CLI auto-install failed: ${result.error}`);
+    }
   }
 
-  logger.info('Auto-installing openclaw CLI...');
-  const result = await installOpenClawCli();
-  if (result.success) {
-    logger.info(`CLI auto-installed at ${result.path}`);
-    ensureLocalBinInPath();
-    if (result.path) notify?.(result.path);
-  } else {
-    logger.warn(`CLI auto-install failed: ${result.error}`);
-  }
+  if (installedAny) ensureLocalBinInPath();
 }
 
 // ── Completion helpers ───────────────────────────────────────────────────────
