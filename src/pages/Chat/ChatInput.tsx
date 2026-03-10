@@ -372,7 +372,7 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
               isComposingRef.current = false;
             }}
             onPaste={handlePaste}
-            placeholder={disabled ? 'Gateway not connected...' : 'Message (Enter to send, Shift+Enter for new line)'}
+            placeholder={disabled ? 'Gateway not connected...' : 'Message'}
             disabled={disabled}
             className="min-h-[42px] max-h-[200px] resize-none pr-4"
             rows={1}
@@ -395,9 +395,8 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
           )}
         </Button>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>Tip: switch sessions from the sidebar to keep context clean.</span>
-        {hasFailedAttachments && (
+      {hasFailedAttachments && (
+        <div className="mt-2 flex items-center justify-end text-xs text-muted-foreground">
           <Button
             variant="link"
             size="sm"
@@ -409,8 +408,8 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
           >
             Retry failed attachments
           </Button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { invokeIpc } from '@/lib/api-client';
 import { useTranslation } from 'react-i18next';
+const isMac = window.electron?.platform === 'darwin';
 
 type SessionBucketKey =
   | 'today'
@@ -51,12 +52,12 @@ function NavItem({ to, icon, label, badge, collapsed, onClick }: NavItemProps) {
       onClick={onClick}
       className={({ isActive }) =>
         cn(
-          'relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors',
+          'relative flex h-9 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors',
           'hover:bg-accent/60 hover:text-foreground',
           isActive
             ? 'bg-foreground/5 text-foreground'
             : 'text-muted-foreground',
-          isActive && 'before:absolute before:left-1 before:top-1/2 before:h-4 before:w-1 before:-translate-y-1/2 before:rounded-full before:bg-foreground/60',
+          isActive && 'shadow-[0_0_0_1px_rgba(0,0,0,0.04)]',
           collapsed && 'justify-center px-2'
         )
       }
@@ -172,25 +173,12 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col transition-all duration-300',
+        'flex min-h-0 shrink-0 flex-col bg-background transition-all duration-300',
         sidebarCollapsed ? 'w-16' : 'w-60'
       )}
     >
-      <div className="m-1 flex h-full flex-col rounded-2xl border border-border/60 bg-card/70 p-2 backdrop-blur">
-        <div className={cn('flex items-center gap-2 px-2 py-2', sidebarCollapsed && 'justify-center')}>
-          <div className="h-8 w-8 rounded-xl bg-foreground/5 flex items-center justify-center">
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </div>
-          {!sidebarCollapsed && (
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold leading-tight">Oclaw</span>
-              <span className="text-[11px] text-muted-foreground">Workspace</span>
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-hidden flex flex-col px-1 gap-1">
+      {/* Navigation */}
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-3 space-y-1">
           {/* Chat nav item: acts as "New Chat" button, never highlighted as active */}
           <button
             onClick={() => {
@@ -199,12 +187,12 @@ export function Sidebar() {
               navigate('/');
             }}
             className={cn(
-              'flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors',
-              'hover:bg-accent/60 hover:text-foreground text-muted-foreground',
+              'flex h-9 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors shadow-[0_0_0_1px_rgba(0,0,0,0.04)]',
+              'bg-foreground/5 text-foreground hover:bg-foreground/10',
               sidebarCollapsed && 'justify-center px-2',
             )}
           >
-          <MessageSquare className="h-4 w-4 shrink-0" />
+            <MessageSquare className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span className="flex-1 text-left">{t('sidebar.newChat')}</span>}
           </button>
 
@@ -218,7 +206,7 @@ export function Sidebar() {
 
           {/* Session list — below Settings, only when expanded */}
           {!sidebarCollapsed && sessions.length > 0 && (
-            <div className="mt-2 overflow-y-auto max-h-72 space-y-1 pr-1">
+            <div className="mt-2 space-y-1 pr-1">
               {sessionBuckets.map((bucket) => (
                 bucket.sessions.length > 0 ? (
                   <div key={bucket.key} className="pt-1">
@@ -260,13 +248,12 @@ export function Sidebar() {
                     ))}
                   </div>
                 ) : null
-              ))}
-            </div>
-          )}
-        </nav>
+            ))}
+          </div>
+        )}
 
         {/* Footer */}
-        <div className="mt-2 flex items-center justify-between px-2 py-3 border-t border-border/60">
+        <div className="mt-3 flex items-center justify-between px-1 pt-3">
           {devModeUnlocked && !sidebarCollapsed && (
             <Button
               variant="ghost"
@@ -280,19 +267,23 @@ export function Sidebar() {
             </Button>
           )}
 
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-1.5 rounded-lg hover:bg-accent/60 transition-colors text-muted-foreground"
-            title={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronLeft className="h-4 w-4" />
-            )}
-          </button>
+          {!devModeUnlocked && <div />}
+
+          {!isMac && (
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-1.5 rounded-lg hover:bg-accent/60 transition-colors text-muted-foreground"
+              title={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </button>
+          )}
         </div>
-      </div>
+      </nav>
 
       <ConfirmDialog
         open={!!sessionToDelete}

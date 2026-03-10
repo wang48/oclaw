@@ -4,13 +4,18 @@
  */
 import { Tray, Menu, BrowserWindow, app, nativeImage } from 'electron';
 import { join } from 'path';
+import type { UpdateStatus } from './updater';
 
 let tray: Tray | null = null;
+let trayState: { mainWindow: BrowserWindow; options: TrayOptions } | null = null;
+let trayUpdateStatus: UpdateStatus | null = null;
 
 interface TrayOptions {
   showWindow: () => void;
   openControl: () => void;
   stopAndQuit: () => void;
+  downloadUpdate?: () => void;
+  installUpdate?: () => void;
 }
 
 /**
@@ -26,6 +31,81 @@ function getIconsDir(): string {
 /**
  * Create system tray icon and menu
  */
+function buildUpdateMenuItems(options: TrayOptions, status: UpdateStatus | null): Electron.MenuItemConstructorOptions[] {
+  if (!status) return [];
+  if (status.status === 'available') {
+    const version = status.info?.version ? ` (${status.info.version})` : '';
+    return [
+      {
+        label: `Update available${version}`,
+        click: () => options.downloadUpdate?.(),
+        enabled: typeof options.downloadUpdate === 'function',
+      },
+    ];
+  }
+  if (status.status === 'downloading') {
+    return [
+      {
+        label: 'Downloading update…',
+        enabled: false,
+      },
+    ];
+  }
+  if (status.status === 'downloaded') {
+    return [
+      {
+        label: 'Install update',
+        click: () => options.installUpdate?.(),
+        enabled: typeof options.installUpdate === 'function',
+      },
+    ];
+  }
+  return [];
+}
+
+function buildContextMenu(mainWindow: BrowserWindow, options: TrayOptions, status: UpdateStatus | null): Electron.MenuItemConstructorOptions[] {
+  const showWindow = () => {
+    if (mainWindow.isDestroyed()) return;
+    options.showWindow();
+  };
+  const updateItems = buildUpdateMenuItems(options, status);
+
+  return [
+    {
+      label: 'Show Oclaw',
+      click: showWindow,
+    },
+    {
+      type: 'separator',
+    },
+    {
+      label: 'Gateway Status',
+      enabled: false,
+    },
+    {
+      label: '  Running',
+      type: 'checkbox',
+      checked: true,
+      enabled: false,
+    },
+    ...(updateItems.length > 0
+      ? [
+          { type: 'separator' },
+          ...updateItems,
+        ]
+      : []),
+    {
+      type: 'separator',
+    },
+    {
+      label: 'Quit Oclaw',
+      click: () => {
+        options.stopAndQuit();
+      },
+    },
+  ];
+}
+
 export function createTray(mainWindow: BrowserWindow, options: TrayOptions): Tray {
   // Use platform-appropriate icon for system tray
   const iconsDir = getIconsDir();
@@ -61,121 +141,25 @@ export function createTray(mainWindow: BrowserWindow, options: TrayOptions): Tra
   }
   
   tray = new Tray(icon);
+  trayState = { mainWindow, options };
   
   // Set tooltip
   tray.setToolTip('Oclaw - AI Assistant');
-  
-  const showWindow = () => {
-    if (mainWindow.isDestroyed()) return;
-    options.showWindow();
-  };
 
-  // Create context menu
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show Oclaw',
-      click: showWindow,
-    },
-    {
-      type: 'separator',
-    },
-    {
-      label: 'Gateway Status',
-      enabled: false,
-    },
-    {
-      label: '  Running',
-      type: 'checkbox',
-      checked: true,
-      enabled: false,
-    },
-    {
-      type: 'separator',
-    },
-    {
-      label: 'Quick Actions',
-      submenu: [
-        {
-          label: 'Open Dashboard',
-          click: () => {
-            if (mainWindow.isDestroyed()) return;
-            options.showWindow();
-            mainWindow.webContents.send('navigate', '/');
-          },
-        },
-        {
-          label: 'Open Chat',
-          click: () => {
-            if (mainWindow.isDestroyed()) return;
-            options.showWindow();
-            mainWindow.webContents.send('navigate', '/chat');
-          },
-        },
-        {
-          label: 'Open Control UI',
-          click: () => {
-            options.openControl();
-          },
-        },
-        {
-          label: 'Open Settings',
-          click: () => {
-            if (mainWindow.isDestroyed()) return;
-            options.showWindow();
-            mainWindow.webContents.send('navigate', '/settings');
-          },
-        },
-      ],
-    },
-    {
-      type: 'separator',
-    },
-    {
-      label: 'Check for Updates...',
-      click: () => {
-        if (mainWindow.isDestroyed()) return;
-        mainWindow.webContents.send('update:check');
-      },
-    },
-    {
-      type: 'separator',
-    },
-    {
-      label: 'Stop OpenClaw',
-      click: () => {
-        options.stopAndQuit();
-      },
-    },
-    {
-      type: 'separator',
-    },
-    {
-      label: 'Quit Oclaw',
-      click: () => {
-        options.stopAndQuit();
-      },
-    },
-  ]);
-  
-  tray.setContextMenu(contextMenu);
-  
-  // Click to show window (Windows/Linux)
-  tray.on('click', () => {
-    if (mainWindow.isDestroyed()) return;
-    if (mainWindow.isVisible()) {
-      mainWindow.hide();
-    } else {
-      options.showWindow();
-    }
-  });
-  
-  // Double-click to show window (Windows)
-  tray.on('double-click', () => {
-    if (mainWindow.isDestroyed()) return;
-    options.showWindow();
-  });
+  updateTrayMenu();
   
   return tray;
+}
+
+export function updateTrayMenu(status?: UpdateStatus): void {
+  if (status) {
+    trayUpdateStatus = status;
+  }
+  if (!tray || !trayState) return;
+  const contextMenu = Menu.buildFromTemplate(
+    buildContextMenu(trayState.mainWindow, trayState.options, trayUpdateStatus)
+  );
+  tray.setContextMenu(contextMenu);
 }
 
 /**

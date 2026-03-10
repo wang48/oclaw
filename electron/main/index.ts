@@ -6,7 +6,7 @@ import { app, BrowserWindow, nativeImage, session, shell } from 'electron';
 import { join } from 'path';
 import { GatewayManager } from '../gateway/manager';
 import { registerIpcHandlers } from './ipc-handlers';
-import { createTray } from './tray';
+import { createTray, updateTrayMenu } from './tray';
 import { createMenu } from './menu';
 
 import { appUpdater, registerUpdateHandlers } from './updater';
@@ -370,6 +370,18 @@ async function initialize(options: { background: boolean; ensureGateway: boolean
     stopAndQuit: () => {
       void stopServiceAndQuit();
     },
+    downloadUpdate: () => {
+      void appUpdater.downloadUpdate().catch((error) => {
+        logger.warn('Failed to download update from tray:', error);
+      });
+    },
+    installUpdate: () => {
+      appUpdater.quitAndInstall();
+    },
+  });
+  updateTrayMenu(appUpdater.getStatus());
+  appUpdater.on('status-changed', (status) => {
+    updateTrayMenu(status);
   });
   registerWindowLifecycle();
   registerGatewayStateSync();

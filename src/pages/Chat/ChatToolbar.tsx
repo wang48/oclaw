@@ -32,7 +32,7 @@ export function ChatToolbar() {
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent side="bottom" sideOffset={6}>
           <p>{t('toolbar.refresh')}</p>
         </TooltipContent>
       </Tooltip>
@@ -52,7 +52,7 @@ export function ChatToolbar() {
             <Brain className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent side="bottom" sideOffset={6}>
           <p>{showThinking ? t('toolbar.hideThinking') : t('toolbar.showThinking')}</p>
         </TooltipContent>
       </Tooltip>

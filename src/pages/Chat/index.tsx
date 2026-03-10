@@ -5,8 +5,7 @@
  * are in the toolbar; messages render with markdown + streaming.
  */
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Bot, Loader2, MessageSquare, Sparkles } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import { Panel } from '@/components/common/Panel';
 import { useChatStore, type RawMessage } from '@/stores/chat';
 import { useGatewayStore } from '@/stores/gateway';
@@ -16,6 +15,7 @@ import { ChatInput } from './ChatInput';
 import { ChatToolbar } from './ChatToolbar';
 import { extractImages, extractText, extractThinking, extractToolUse } from './message-utils';
 import { useTranslation } from 'react-i18next';
+import logoPng from '@/assets/logo.png';
 
 export function Chat() {
   const { t } = useTranslation('chat');
@@ -109,9 +109,8 @@ export function Chat() {
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="sticky top-0 z-10 border-b border-border/50 bg-background/70 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
-          <div className="text-sm font-medium text-muted-foreground">{t('welcome.title')}</div>
+      <div className="sticky top-0 z-10 border-b border-border/50 bg-background">
+        <div className="mx-auto flex max-w-4xl items-center justify-end px-6 py-2">
           <ChatToolbar />
         </div>
       </div>
@@ -192,7 +191,7 @@ export function Chat() {
       )}
 
       {/* Input Area */}
-      <div className="sticky bottom-0 border-t border-border/60 bg-background/80 backdrop-blur px-6 py-4">
+      <div className="sticky bottom-0 border-t border-border/60 bg-background px-6 py-4">
         <div className="max-w-4xl mx-auto">
           <ChatInput
             onSend={sendMessage}
@@ -209,31 +208,9 @@ export function Chat() {
 // ── Welcome Screen ──────────────────────────────────────────────
 
 function WelcomeScreen() {
-  const { t } = useTranslation('chat');
   return (
     <div className="flex flex-col items-center justify-center text-center py-20">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mb-6">
-        <Bot className="h-8 w-8 text-white" />
-      </div>
-      <h2 className="text-2xl font-bold mb-2">{t('welcome.title')}</h2>
-      <p className="text-muted-foreground mb-8 max-w-md">
-        {t('welcome.subtitle')}
-      </p>
-
-      <div className="grid grid-cols-2 gap-4 max-w-lg w-full">
-        {[
-          { icon: MessageSquare, title: t('welcome.askQuestions'), desc: t('welcome.askQuestionsDesc') },
-          { icon: Sparkles, title: t('welcome.creativeTasks'), desc: t('welcome.creativeTasksDesc') },
-        ].map((item, i) => (
-          <Card key={i} className="text-left">
-            <CardContent className="p-4">
-              <item.icon className="h-6 w-6 text-primary mb-2" />
-              <h3 className="font-medium">{item.title}</h3>
-              <p className="text-sm text-muted-foreground">{item.desc}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <img src={logoPng} alt="Oclaw" className="h-16 w-16 rounded-2xl object-cover" />
     </div>
   );
 }

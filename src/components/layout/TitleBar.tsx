@@ -4,19 +4,37 @@
  * Windows/Linux: icon + "Oclaw" on left, minimize/maximize/close on right.
  */
 import { useState, useEffect } from 'react';
-import { Minus, Square, X, Copy } from 'lucide-react';
+import { Minus, Square, X, Copy, Sidebar } from 'lucide-react';
 import logoPng from '@/assets/logo.png';
 import { invokeIpc } from '@/lib/api-client';
+import { useSettingsStore } from '@/stores/settings';
 
 const isMac = window.electron?.platform === 'darwin';
 
 export function TitleBar() {
   if (isMac) {
     // macOS: just a drag region, traffic lights are native
-    return <div className="drag-region h-9 shrink-0 border-b border-border/60 bg-background/60 backdrop-blur" />;
+    return <MacTitleBar />;
   }
 
   return <WindowsTitleBar />;
+}
+
+function MacTitleBar() {
+  const sidebarCollapsed = useSettingsStore((state) => state.sidebarCollapsed);
+  const setSidebarCollapsed = useSettingsStore((state) => state.setSidebarCollapsed);
+
+  return (
+    <div className="drag-region relative h-9 shrink-0 bg-background">
+      <button
+        className="no-drag absolute left-[76px] top-[16px] -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:bg-accent/60 transition-colors"
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        <Sidebar className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
 
 function WindowsTitleBar() {
@@ -46,7 +64,7 @@ function WindowsTitleBar() {
   };
 
   return (
-    <div className="drag-region flex h-9 shrink-0 items-center justify-between border-b border-border/60 bg-background/70 backdrop-blur">
+    <div className="drag-region flex h-9 shrink-0 items-center justify-between bg-background">
       {/* Left: Icon + App Name */}
       <div className="no-drag flex items-center gap-2 pl-3">
         <img src={logoPng} alt="Oclaw" className="h-5 w-auto" />

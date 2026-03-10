@@ -280,7 +280,7 @@ export function Settings() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="min-h-0 space-y-6 p-6">
       <PageHeader title={t('title')} description={t('subtitle')} />
 
       {/* Appearance */}
