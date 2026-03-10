@@ -652,7 +652,7 @@ export function createGatewayWsTransportInvoker(options: GatewayWsTransportOptio
         client: {
           id: 'oclaw-ui',
           displayName: 'Oclaw UI',
-          version: '0.1.0-beta.2',
+          version: '0.1.0',
           platform: window.electron?.platform ?? 'unknown',
           mode: 'ui',
         },
