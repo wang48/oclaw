@@ -1,4 +1,6 @@
 {
+    "title": "Overview",
+    "description": "Status and quick access to core controls",
     "gateway": "Gateway",
     "channels": "Channels",
     "skills": "Skills",

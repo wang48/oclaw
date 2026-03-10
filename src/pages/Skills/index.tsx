@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSkillsStore } from '@/stores/skills';
 import { useGatewayStore } from '@/stores/gateway';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { PageHeader } from '@/components/common/PageHeader';
 import { cn } from '@/lib/utils';
 import { invokeIpc } from '@/lib/api-client';
 import { trackUiEvent } from '@/lib/telemetry';
@@ -744,28 +745,25 @@ export function Skills() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('title')}</h1>
-          <p className="text-muted-foreground">
-            {t('subtitle')}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={fetchSkills} disabled={!isGatewayRunning}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            {t('refresh')}
-          </Button>
-          {hasInstalledSkills && (
-            <Button variant="outline" onClick={handleOpenSkillsFolder}>
-              <FolderOpen className="h-4 w-4 mr-2" />
-              {t('openFolder')}
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={(
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={fetchSkills} disabled={!isGatewayRunning}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {t('refresh')}
             </Button>
-          )}
-        </div>
-      </div>
+            {hasInstalledSkills && (
+              <Button variant="outline" onClick={handleOpenSkillsFolder}>
+                <FolderOpen className="h-4 w-4 mr-2" />
+                {t('openFolder')}
+              </Button>
+            )}
+          </div>
+        )}
+      />
 
       {/* Gateway Warning */}
       {showGatewayWarning && (

@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Bot, Loader2, MessageSquare, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Panel } from '@/components/common/Panel';
 import { useChatStore, type RawMessage } from '@/stores/chat';
 import { useGatewayStore } from '@/stores/gateway';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -80,12 +81,12 @@ export function Chat() {
   // Gateway not running
   if (!isGatewayRunning) {
     return (
-      <div className="flex h-[calc(100vh-8rem)] flex-col items-center justify-center text-center p-8">
-        <AlertCircle className="h-12 w-12 text-yellow-500 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">{t('gatewayNotRunning')}</h2>
-        <p className="text-muted-foreground max-w-md">
-          {t('gatewayRequired')}
-        </p>
+      <div className="flex h-full items-center justify-center p-8">
+        <Panel className="w-full max-w-xl p-8 text-center">
+          <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold mb-2">{t('gatewayNotRunning')}</h2>
+          <p className="text-muted-foreground">{t('gatewayRequired')}</p>
+        </Panel>
       </div>
     );
   }
@@ -106,14 +107,17 @@ export function Chat() {
   const hasAnyStreamContent = hasStreamText || hasStreamThinking || hasStreamTools || hasStreamImages || hasStreamToolStatus;
 
   return (
-    <div className="flex flex-col -m-6" style={{ height: 'calc(100vh - 2.5rem)' }}>
+    <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex shrink-0 items-center justify-end px-4 py-2">
-        <ChatToolbar />
+      <div className="sticky top-0 z-10 border-b border-border/50 bg-background/70 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
+          <div className="text-sm font-medium text-muted-foreground">{t('welcome.title')}</div>
+          <ChatToolbar />
+        </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-4xl mx-auto space-y-4">
           {loading && !sending ? (
             <div className="flex h-full items-center justify-center py-20">
@@ -171,7 +175,7 @@ export function Chat() {
 
       {/* Error bar */}
       {error && (
-        <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20">
+        <div className="px-6 py-2 border-t border-destructive/20 bg-destructive/10">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <p className="text-sm text-destructive flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
@@ -179,7 +183,7 @@ export function Chat() {
             </p>
             <button
               onClick={clearError}
-              className="text-xs text-destructive/60 hover:text-destructive underline"
+              className="text-xs text-destructive/70 hover:text-destructive underline"
             >
               {t('common:actions.dismiss')}
             </button>
@@ -188,12 +192,16 @@ export function Chat() {
       )}
 
       {/* Input Area */}
-      <ChatInput
-        onSend={sendMessage}
-        onStop={abortRun}
-        disabled={!isGatewayRunning}
-        sending={sending}
-      />
+      <div className="sticky bottom-0 border-t border-border/60 bg-background/80 backdrop-blur px-6 py-4">
+        <div className="max-w-4xl mx-auto">
+          <ChatInput
+            onSend={sendMessage}
+            onStop={abortRun}
+            disabled={!isGatewayRunning}
+            sending={sending}
+          />
+        </div>
+      </div>
     </div>
   );
 }

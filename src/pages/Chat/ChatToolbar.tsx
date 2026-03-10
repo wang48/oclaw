@@ -25,7 +25,7 @@ export function ChatToolbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7 rounded-lg hover:bg-foreground/5"
             onClick={() => refresh()}
             disabled={loading}
           >
@@ -44,8 +44,8 @@ export function ChatToolbar() {
             variant="ghost"
             size="icon"
             className={cn(
-              'h-8 w-8',
-              showThinking && 'bg-primary/10 text-primary',
+              'h-7 w-7 rounded-lg',
+              showThinking && 'bg-foreground/10 text-foreground',
             )}
             onClick={toggleThinking}
           >

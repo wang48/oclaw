@@ -29,6 +29,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PageHeader } from '@/components/common/PageHeader';
+import { Panel } from '@/components/common/Panel';
 import { useChannelsStore } from '@/stores/channels';
 import { useGatewayStore } from '@/stores/gateway';
 import { StatusBadge, type Status } from '@/components/common/StatusBadge';
@@ -172,81 +174,73 @@ export function Channels() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('title')}</h1>
-          <p className="text-muted-foreground">
-            {t('subtitle')}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={async () => {
-              try {
-                setRefreshing(true);
-                await fetchChannels({ probe: true, silent: true });
-                await fetchConfiguredTypes();
-              } finally {
-                setRefreshing(false);
-              }
-            }}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2${refreshing ? ' animate-spin' : ''}`} />
-            {t('refresh')}
-          </Button>
-          <Button onClick={() => setShowAddDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t('addChannel')}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={(
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  setRefreshing(true);
+                  await fetchChannels({ probe: true, silent: true });
+                  await fetchConfiguredTypes();
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2${refreshing ? ' animate-spin' : ''}`} />
+              {t('refresh')}
+            </Button>
+            <Button onClick={() => setShowAddDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              {t('addChannel')}
+            </Button>
+          </div>
+        )}
+      />
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-6">
+      <Panel className="p-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-border/50 bg-background/60 p-4">
             <div className="flex items-center gap-4">
               <div className="rounded-full bg-primary/10 p-3">
-                <Radio className="h-6 w-6 text-primary" />
+                <Radio className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{configuredChannels.length}</p>
+                <p className="text-2xl font-semibold">{configuredChannels.length}</p>
                 <p className="text-sm text-muted-foreground">{t('stats.total')}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
+          </div>
+          <div className="rounded-xl border border-border/50 bg-background/60 p-4">
             <div className="flex items-center gap-4">
-              <div className="rounded-full bg-green-100 p-3 dark:bg-green-900">
-                <Power className="h-6 w-6 text-green-600" />
+              <div className="rounded-full bg-emerald-500/15 p-3">
+                <Power className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{connectedCount}</p>
+                <p className="text-2xl font-semibold">{connectedCount}</p>
                 <p className="text-sm text-muted-foreground">{t('stats.connected')}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
+          </div>
+          <div className="rounded-xl border border-border/50 bg-background/60 p-4">
             <div className="flex items-center gap-4">
-              <div className="rounded-full bg-slate-100 p-3 dark:bg-slate-800">
-                <PowerOff className="h-6 w-6 text-slate-600" />
+              <div className="rounded-full bg-amber-500/15 p-3">
+                <PowerOff className="h-5 w-5 text-amber-600 dark:text-amber-300" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{configuredChannels.length - connectedCount}</p>
+                <p className="text-2xl font-semibold">{configuredChannels.length - connectedCount}</p>
                 <p className="text-sm text-muted-foreground">{t('stats.disconnected')}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </Panel>
 
       {/* Gateway Warning */}
       {showGatewayWarning && (

@@ -190,9 +190,9 @@ export function Setup() {
 
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="app-shell flex h-screen flex-col overflow-hidden text-foreground">
       <TitleBar />
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto px-6 pb-10 pt-6">
         {/* Progress Indicator */}
         <div className="flex justify-center pt-8">
           <div className="flex items-center gap-2">

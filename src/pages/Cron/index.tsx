@@ -32,6 +32,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCronStore } from '@/stores/cron';
 import { useGatewayStore } from '@/stores/gateway';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { PageHeader } from '@/components/common/PageHeader';
 import { formatRelativeTime, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { CronJob, CronJobCreateInput, ScheduleType } from '@/types/cron';
@@ -539,32 +540,29 @@ export function Cron() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('title')}</h1>
-          <p className="text-muted-foreground">
-            {t('subtitle')}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchJobs} disabled={!isGatewayRunning}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            {t('refresh')}
-          </Button>
-          <Button
-            onClick={() => {
-              setEditingJob(undefined);
-              setShowDialog(true);
-            }}
-            disabled={!isGatewayRunning}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            {t('newTask')}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title={t('title')}
+        description={t('subtitle')}
+        actions={(
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={fetchJobs} disabled={!isGatewayRunning}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {t('refresh')}
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingJob(undefined);
+                setShowDialog(true);
+              }}
+              disabled={!isGatewayRunning}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {t('newTask')}
+            </Button>
+          </div>
+        )}
+      />
 
       {/* Gateway Warning */}
       {!isGatewayRunning && (

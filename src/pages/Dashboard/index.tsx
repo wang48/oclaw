@@ -17,7 +17,6 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGatewayStore } from '@/stores/gateway';
@@ -29,6 +28,8 @@ import { FeedbackState } from '@/components/common/FeedbackState';
 import { invokeIpc } from '@/lib/api-client';
 import { trackUiEvent } from '@/lib/telemetry';
 import { useTranslation } from 'react-i18next';
+import { PageHeader } from '@/components/common/PageHeader';
+import { Panel } from '@/components/common/Panel';
 
 type UsageHistoryEntry = {
   timestamp: string;
@@ -128,79 +129,77 @@ export function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Status Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Gateway Status */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">{t('gateway')}</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
+    <div className="space-y-6 p-6">
+      <PageHeader
+        title={t('title')}
+        description={t('description')}
+        actions={(
+          <Button variant="outline" size="sm" onClick={openDevConsole}>
+            <Terminal className="h-4 w-4 mr-2" />
+            {t('quickActions.devConsole')}
+          </Button>
+        )}
+      />
+
+      <Panel className="p-5">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-border/50 bg-background/60 p-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{t('gateway')}</span>
+              <Activity className="h-4 w-4" />
+            </div>
+            <div className="mt-2 flex items-center gap-2">
               <StatusBadge status={gatewayStatus.state} />
             </div>
             {gatewayStatus.state === 'running' && (
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {t('port', { port: gatewayStatus.port })} | {t('pid', { pid: gatewayStatus.pid || 'N/A' })}
               </p>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Channels */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">{t('channels')}</CardTitle>
-            <Radio className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{connectedChannels}</div>
+          </div>
+          <div className="rounded-xl border border-border/50 bg-background/60 p-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{t('channels')}</span>
+              <Radio className="h-4 w-4" />
+            </div>
+            <div className="mt-2 text-2xl font-semibold">{connectedChannels}</div>
             <p className="text-xs text-muted-foreground">
               {t('connectedOf', { connected: connectedChannels, total: channels.length })}
             </p>
-          </CardContent>
-        </Card>
-
-        {/* Skills */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">{t('skills')}</CardTitle>
-            <Puzzle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{enabledSkills}</div>
+          </div>
+          <div className="rounded-xl border border-border/50 bg-background/60 p-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{t('skills')}</span>
+              <Puzzle className="h-4 w-4" />
+            </div>
+            <div className="mt-2 text-2xl font-semibold">{enabledSkills}</div>
             <p className="text-xs text-muted-foreground">
               {t('enabledOf', { enabled: enabledSkills, total: skills.length })}
             </p>
-          </CardContent>
-        </Card>
-
-        {/* Uptime */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">{t('uptime')}</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          </div>
+          <div className="rounded-xl border border-border/50 bg-background/60 p-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{t('uptime')}</span>
+              <Clock className="h-4 w-4" />
+            </div>
+            <div className="mt-2 text-2xl font-semibold">
               {uptime > 0 ? formatUptime(uptime) : '—'}
             </div>
             <p className="text-xs text-muted-foreground">
               {gatewayStatus.state === 'running' ? t('sinceRestart') : t('gatewayNotRunning')}
             </p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </Panel>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('quickActions.title')}</CardTitle>
-          <CardDescription>{t('quickActions.description')}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Panel className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold">{t('quickActions.title')}</h2>
+            <p className="text-sm text-muted-foreground">{t('quickActions.description')}</p>
+          </div>
+        </div>
+        <div className="mt-4">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
             <Button variant="outline" className="h-auto flex-col gap-2 py-4" asChild>
               <Link to="/settings" onClick={() => trackUiEvent('dashboard.quick_action', { action: 'add_provider' })}>
@@ -249,17 +248,14 @@ export function Dashboard() {
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Connected Channels */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t('connectedChannels')}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel className="p-5">
+          <h3 className="text-base font-semibold mb-3">{t('connectedChannels')}</h3>
             {channels.length === 0 ? (
               <FeedbackState
                 state="empty"
@@ -275,7 +271,7 @@ export function Dashboard() {
                 {channels.slice(0, 5).map((channel) => (
                   <div
                     key={channel.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    className="flex items-center justify-between rounded-xl border border-border/50 bg-background/60 p-3"
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-lg">
@@ -295,15 +291,11 @@ export function Dashboard() {
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </Panel>
 
         {/* Enabled Skills */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{t('activeSkills')}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel className="p-5">
+          <h3 className="text-base font-semibold mb-3">{t('activeSkills')}</h3>
             {skills.filter((s) => s.enabled).length === 0 ? (
               <FeedbackState
                 state="empty"
@@ -332,16 +324,14 @@ export function Dashboard() {
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </Panel>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{t('recentTokenHistory.title')}</CardTitle>
-          <CardDescription>{t('recentTokenHistory.description')}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Panel className="p-5">
+        <div className="mb-4">
+          <h3 className="text-base font-semibold">{t('recentTokenHistory.title')}</h3>
+          <p className="text-sm text-muted-foreground">{t('recentTokenHistory.description')}</p>
+        </div>
           {usageLoading ? (
             <FeedbackState state="loading" title={t('recentTokenHistory.loading')} />
           ) : visibleUsageHistory.length === 0 ? (
@@ -487,8 +477,7 @@ export function Dashboard() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </Panel>
     </div>
   );
 }

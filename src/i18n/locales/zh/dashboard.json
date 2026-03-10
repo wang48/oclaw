@@ -1,4 +1,6 @@
 {
+    "title": "概览",
+    "description": "核心状态与快捷入口",
     "gateway": "网关",
     "channels": "频道",
     "skills": "技能",

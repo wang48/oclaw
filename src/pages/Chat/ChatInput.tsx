@@ -11,6 +11,7 @@ import { Send, Square, X, Paperclip, FileText, Film, Music, FileArchive, File, L
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { invokeIpc } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -322,93 +323,93 @@ export function ChatInput({ onSend, onStop, disabled = false, sending = false }:
 
   return (
     <div
-      className="bg-background p-4"
+      className={cn(
+        'rounded-2xl border border-border/60 bg-card/80 p-3 shadow-[0_1px_0_rgba(0,0,0,0.03)] backdrop-blur',
+        dragOver && 'ring-2 ring-foreground/20'
+      )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="max-w-4xl mx-auto">
-        {/* Attachment Previews */}
-        {attachments.length > 0 && (
-          <div className="flex gap-2 mb-2 flex-wrap">
-            {attachments.map((att) => (
-              <AttachmentPreview
-                key={att.id}
-                attachment={att}
-                onRemove={() => removeAttachment(att.id)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Input Row */}
-        <div className={`flex items-end gap-2 ${dragOver ? 'ring-2 ring-primary rounded-lg' : ''}`}>
-
-          {/* Attach Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0 h-[44px] w-[44px]"
-            onClick={pickFiles}
-            disabled={disabled || sending}
-            title="Attach files"
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-
-          {/* Textarea */}
-          <div className="flex-1 relative">
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onCompositionStart={() => {
-                isComposingRef.current = true;
-              }}
-              onCompositionEnd={() => {
-                isComposingRef.current = false;
-              }}
-              onPaste={handlePaste}
-              placeholder={disabled ? 'Gateway not connected...' : 'Message (Enter to send, Shift+Enter for new line)'}
-              disabled={disabled}
-              className="min-h-[44px] max-h-[200px] resize-none pr-4"
-              rows={1}
+      {/* Attachment Previews */}
+      {attachments.length > 0 && (
+        <div className="flex gap-2 mb-3 flex-wrap">
+          {attachments.map((att) => (
+            <AttachmentPreview
+              key={att.id}
+              attachment={att}
+              onRemove={() => removeAttachment(att.id)}
             />
-          </div>
+          ))}
+        </div>
+      )}
 
-          {/* Send Button */}
-          <Button
-            onClick={sending ? handleStop : handleSend}
-            disabled={sending ? !canStop : !canSend}
-            size="icon"
-            className="shrink-0 h-[44px] w-[44px]"
-            variant={sending ? 'destructive' : 'default'}
-            title={sending ? 'Stop' : 'Send'}
-          >
-            {sending ? (
-              <Square className="h-4 w-4" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
+      {/* Input Row */}
+      <div className="flex items-end gap-2">
+        {/* Attach Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 h-[42px] w-[42px] rounded-xl bg-foreground/5 hover:bg-foreground/10"
+          onClick={pickFiles}
+          disabled={disabled || sending}
+          title="Attach files"
+        >
+          <Paperclip className="h-4 w-4" />
+        </Button>
+
+        {/* Textarea */}
+        <div className="flex-1 relative">
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              isComposingRef.current = false;
+            }}
+            onPaste={handlePaste}
+            placeholder={disabled ? 'Gateway not connected...' : 'Message (Enter to send, Shift+Enter for new line)'}
+            disabled={disabled}
+            className="min-h-[42px] max-h-[200px] resize-none pr-4"
+            rows={1}
+          />
         </div>
-        <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>Tip: switch sessions from the sidebar to keep context clean.</span>
-          {hasFailedAttachments && (
-            <Button
-              variant="link"
-              size="sm"
-              className="h-auto p-0 text-xs"
-              onClick={() => {
-                setAttachments((prev) => prev.filter((att) => att.status !== 'error'));
-                void pickFiles();
-              }}
-            >
-              Retry failed attachments
-            </Button>
+
+        {/* Send Button */}
+        <Button
+          onClick={sending ? handleStop : handleSend}
+          disabled={sending ? !canStop : !canSend}
+          size="icon"
+          className="shrink-0 h-[42px] w-[42px] rounded-xl"
+          variant={sending ? 'destructive' : 'default'}
+          title={sending ? 'Stop' : 'Send'}
+        >
+          {sending ? (
+            <Square className="h-4 w-4" />
+          ) : (
+            <Send className="h-4 w-4" />
           )}
-        </div>
+        </Button>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>Tip: switch sessions from the sidebar to keep context clean.</span>
+        {hasFailedAttachments && (
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-xs"
+            onClick={() => {
+              setAttachments((prev) => prev.filter((att) => att.status !== 'error'));
+              void pickFiles();
+            }}
+          >
+            Retry failed attachments
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -426,7 +427,7 @@ function AttachmentPreview({
   const isImage = attachment.mimeType.startsWith('image/') && attachment.preview;
 
   return (
-    <div className="relative group rounded-lg overflow-hidden border border-border">
+    <div className="relative group rounded-xl overflow-hidden border border-border/60 bg-card/60">
       {isImage ? (
         // Image thumbnail
         <div className="w-16 h-16">
@@ -438,7 +439,7 @@ function AttachmentPreview({
         </div>
       ) : (
         // Generic file card
-        <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 max-w-[200px]">
+        <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 max-w-[200px]">
           <FileIcon mimeType={attachment.mimeType} className="h-5 w-5 shrink-0 text-muted-foreground" />
           <div className="min-w-0 overflow-hidden">
             <p className="text-xs font-medium truncate">{attachment.fileName}</p>
