@@ -52,26 +52,31 @@ function NavItem({ to, icon, label, badge, collapsed, onClick }: NavItemProps) {
       onClick={onClick}
       className={({ isActive }) =>
         cn(
-          'relative flex h-9 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors',
+          'relative flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors',
           'hover:bg-accent/60 hover:text-foreground',
           isActive
             ? 'bg-foreground/5 text-foreground'
             : 'text-muted-foreground',
           isActive && 'shadow-[0_0_0_1px_rgba(0,0,0,0.04)]',
-          collapsed && 'justify-center px-2'
+          collapsed && 'justify-center px-0'
         )
       }
     >
-      {icon}
-      {!collapsed && (
-        <>
-          <span className="flex-1">{label}</span>
-          {badge && (
-            <Badge variant="secondary" className="ml-auto">
-              {badge}
-            </Badge>
-          )}
-        </>
+      <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center', collapsed && 'mx-auto')}>
+        {icon}
+      </span>
+      <span
+        className={cn(
+          'flex-1 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-in-out',
+          collapsed ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'
+        )}
+      >
+        {label}
+      </span>
+      {!collapsed && badge && (
+        <Badge variant="secondary" className="ml-auto">
+          {badge}
+        </Badge>
       )}
     </NavLink>
   );
@@ -173,7 +178,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex min-h-0 shrink-0 flex-col bg-background transition-all duration-300',
+        'flex min-h-0 shrink-0 flex-col bg-background transition-[width] duration-200 ease-in-out overflow-hidden',
         sidebarCollapsed ? 'w-16' : 'w-60'
       )}
     >
@@ -187,13 +192,22 @@ export function Sidebar() {
               navigate('/');
             }}
             className={cn(
-              'flex h-9 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors shadow-[0_0_0_1px_rgba(0,0,0,0.04)]',
-              'bg-foreground/5 text-foreground hover:bg-foreground/10',
-              sidebarCollapsed && 'justify-center px-2',
+              'flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition-colors',
+              'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+              sidebarCollapsed && 'justify-center px-0',
             )}
           >
-            <MessageSquare className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && <span className="flex-1 text-left">{t('sidebar.newChat')}</span>}
+            <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center', sidebarCollapsed && 'mx-auto')}>
+              <MessageSquare className="h-4 w-4" />
+            </span>
+            <span
+              className={cn(
+                'flex-1 text-left overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-in-out',
+                sidebarCollapsed ? 'max-w-0 opacity-0' : 'max-w-[200px] opacity-100'
+              )}
+            >
+              {t('sidebar.newChat')}
+            </span>
           </button>
 
           {navItems.map((item) => (

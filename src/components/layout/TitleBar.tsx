@@ -26,13 +26,20 @@ function MacTitleBar() {
 
   return (
     <div className="drag-region relative h-9 shrink-0 bg-background">
-      <button
-        className="no-drag absolute left-[76px] top-[16px] -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:bg-accent/60 transition-colors"
-        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      <div
+        className={
+          `no-drag absolute left-[84px] top-[14px] flex h-5 items-center transition-all duration-200 ease-in-out ` +
+          (sidebarCollapsed ? 'opacity-90 translate-x-1' : 'opacity-100 translate-x-0')
+        }
       >
-        <Sidebar className="h-4 w-4" />
-      </button>
+        <button
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-accent/60 transition-colors"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <Sidebar className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
